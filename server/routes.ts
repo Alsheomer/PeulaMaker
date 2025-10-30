@@ -165,6 +165,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Validate componentIndex is in valid range (0-8 for 9 components)
+      if (validation.data.componentIndex < 0 || validation.data.componentIndex > 8) {
+        return res.status(400).json({ 
+          error: "Invalid component index. Must be between 0 and 8." 
+        });
+      }
+
       const newFeedback = await storage.createFeedback(validation.data);
       res.json(newFeedback);
     } catch (error) {

@@ -3,20 +3,28 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Edit, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Download, Edit, ArrowLeft, Loader2, RefreshCw, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Peula, PeulaContent } from "@shared/schema";
+import type { Peula, PeulaContent, Feedback } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, Fragment } from "react";
 
 export default function PeulaView() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [regeneratingSection, setRegeneratingSection] = useState<number | null>(null);
+  const [expandedFeedback, setExpandedFeedback] = useState<Set<number>>(new Set());
+  const [feedbackInputs, setFeedbackInputs] = useState<Record<number, string>>({});
 
   const { data: peula, isLoading } = useQuery<Peula>({
     queryKey: ["/api/peulot", id],
+    enabled: !!id,
+  });
+
+  const { data: feedbackList = [] } = useQuery<Feedback[]>({
+    queryKey: ["/api/peulot", id, "feedback"],
     enabled: !!id,
   });
 
@@ -66,10 +74,54 @@ export default function PeulaView() {
     },
   });
 
+  const feedbackMutation = useMutation({
+    mutationFn: async ({ peulaId, componentIndex, comment }: { peulaId: string; componentIndex: number; comment: string }) => {
+      const response = await apiRequest("POST", "/api/feedback", { peulaId, componentIndex, comment });
+      return await response.json() as Feedback;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/peulot", id, "feedback"] });
+      toast({
+        title: "Feedback Submitted",
+        description: "Your feedback has been saved and will help improve future peulot.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Feedback Failed",
+        description: "There was an error submitting your feedback. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleRegenerateSection = (sectionIndex: number) => {
     if (!id) return;
     setRegeneratingSection(sectionIndex);
     regenerateMutation.mutate({ peulaId: id, sectionIndex });
+  };
+
+  const toggleFeedback = (index: number) => {
+    const newExpanded = new Set(expandedFeedback);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedFeedback(newExpanded);
+  };
+
+  const handleSubmitFeedback = (componentIndex: number) => {
+    if (!id) return;
+    const comment = feedbackInputs[componentIndex]?.trim();
+    if (!comment) return;
+
+    feedbackMutation.mutate({ peulaId: id, componentIndex, comment });
+    setFeedbackInputs({ ...feedbackInputs, [componentIndex]: "" });
+  };
+
+  const getFeedbackForComponent = (componentIndex: number) => {
+    return feedbackList.filter(fb => fb.componentIndex === componentIndex);
   };
 
   if (isLoading) {
@@ -184,53 +236,128 @@ export default function PeulaView() {
                 </tr>
               </thead>
               <tbody>
-                {content.components.map((component, index) => (
-                  <tr
-                    key={index}
-                    className="border-b border-border last:border-0 hover-elevate"
-                    data-testid={`row-component-${index}`}
-                  >
-                    <td className="p-4 align-top">
-                      <div className="font-medium text-sm text-foreground">
-                        {component.component}
-                      </div>
-                    </td>
-                    <td className="p-4 align-top">
-                      <div className="text-sm text-foreground whitespace-pre-wrap">
-                        {component.description}
-                      </div>
-                    </td>
-                    <td className="p-4 align-top">
-                      <div className="text-sm text-muted-foreground space-y-3">
-                        <div className="whitespace-pre-wrap">
-                          {component.bestPractices}
-                        </div>
-                        {component.timeStructure && (
-                          <div className="pt-2 border-t border-border">
-                            <div className="font-medium text-foreground mb-1">Time Structure:</div>
-                            <div className="whitespace-pre-wrap">{component.timeStructure}</div>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 align-top text-center">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleRegenerateSection(index)}
-                        disabled={regeneratingSection === index}
-                        title="Regenerate this section"
-                        data-testid={`button-regenerate-${index}`}
+                {content.components.map((component, index) => {
+                  const sectionFeedback = getFeedbackForComponent(index);
+                  const isExpanded = expandedFeedback.has(index);
+                  
+                  return (
+                    <Fragment key={index}>
+                      <tr
+                        className="border-b border-border hover-elevate"
+                        data-testid={`row-component-${index}`}
                       >
-                        {regeneratingSection === index ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                        <td className="p-4 align-top">
+                          <div className="font-medium text-sm text-foreground">
+                            {component.component}
+                          </div>
+                        </td>
+                        <td className="p-4 align-top">
+                          <div className="text-sm text-foreground whitespace-pre-wrap">
+                            {component.description}
+                          </div>
+                        </td>
+                        <td className="p-4 align-top">
+                          <div className="text-sm text-muted-foreground space-y-3">
+                            <div className="whitespace-pre-wrap">
+                              {component.bestPractices}
+                            </div>
+                            {component.timeStructure && (
+                              <div className="pt-2 border-t border-border">
+                                <div className="font-medium text-foreground mb-1">Time Structure:</div>
+                                <div className="whitespace-pre-wrap">{component.timeStructure}</div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 align-top text-center">
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleRegenerateSection(index)}
+                              disabled={regeneratingSection === index}
+                              title="Regenerate this section"
+                              data-testid={`button-regenerate-${index}`}
+                            >
+                              {regeneratingSection === index ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => toggleFeedback(index)}
+                              title={isExpanded ? "Hide feedback" : "Add feedback"}
+                              data-testid={`button-feedback-${index}`}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              {sectionFeedback.length > 0 && (
+                                <Badge 
+                                  variant="secondary" 
+                                  className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                                >
+                                  {sectionFeedback.length}
+                                </Badge>
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`feedback-${index}`} className="border-b border-border bg-muted/20">
+                          <td colSpan={4} className="p-4">
+                            <div className="space-y-4">
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                                <h4 className="text-sm font-medium text-foreground">Feedback & Suggestions</h4>
+                              </div>
+                              
+                              {sectionFeedback.length > 0 && (
+                                <div className="space-y-2">
+                                  {sectionFeedback.map((fb) => (
+                                    <Card key={fb.id} className="p-3 bg-background" data-testid={`feedback-item-${fb.id}`}>
+                                      <p className="text-sm text-foreground whitespace-pre-wrap">{fb.comment}</p>
+                                      <p className="text-xs text-muted-foreground mt-2">
+                                        {new Date(fb.createdAt).toLocaleDateString()}
+                                      </p>
+                                    </Card>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="space-y-2">
+                                <Textarea
+                                  placeholder="Share your thoughts on this section - what worked well? What could be improved? Your feedback helps make future peulot better."
+                                  value={feedbackInputs[index] || ""}
+                                  onChange={(e) => setFeedbackInputs({ ...feedbackInputs, [index]: e.target.value })}
+                                  className="min-h-20 resize-none"
+                                  data-testid={`input-feedback-${index}`}
+                                />
+                                <Button
+                                  onClick={() => handleSubmitFeedback(index)}
+                                  disabled={!feedbackInputs[index]?.trim() || feedbackMutation.isPending}
+                                  size="sm"
+                                  data-testid={`button-submit-feedback-${index}`}
+                                >
+                                  {feedbackMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                      Submitting...
+                                    </>
+                                  ) : (
+                                    "Submit Feedback"
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
