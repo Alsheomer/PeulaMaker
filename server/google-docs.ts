@@ -232,7 +232,9 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
     }
     
     // Build requests to populate table cells
-    const populateRequests: any[] = [];
+    // IMPORTANT: Collect all insertions with their indices, then sort in reverse order
+    // This prevents index shifting when inserting text
+    const cellInsertions: Array<{ index: number, text: string }> = [];
     
     // Populate each component (starting from row 1, row 0 is header)
     content.components.forEach((comp, idx) => {
@@ -246,44 +248,37 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
       
       const cells = row.tableCells;
       
+      // Collect all cell insertions with their indices
       // Column 0: Time Type (component category/name)
       if (cells[0]?.content?.[0]?.startIndex !== undefined) {
-        populateRequests.push({
-          insertText: {
-            location: { index: cells[0].content[0].startIndex },
-            text: comp.component
-          }
+        cellInsertions.push({
+          index: cells[0].content[0].startIndex,
+          text: comp.component
         });
       }
       
       // Column 1: Name (component number for reference)
       if (cells[1]?.content?.[0]?.startIndex !== undefined) {
-        populateRequests.push({
-          insertText: {
-            location: { index: cells[1].content[0].startIndex },
-            text: `${idx + 1}`
-          }
+        cellInsertions.push({
+          index: cells[1].content[0].startIndex,
+          text: `${idx + 1}`
         });
       }
       
       // Column 2: Explanation/Content (description + best practices)
       if (cells[2]?.content?.[0]?.startIndex !== undefined) {
         const contentText = `${comp.description}\n\nBest Practices:\n${comp.bestPractices}`;
-        populateRequests.push({
-          insertText: {
-            location: { index: cells[2].content[0].startIndex },
-            text: contentText
-          }
+        cellInsertions.push({
+          index: cells[2].content[0].startIndex,
+          text: contentText
         });
       }
       
       // Column 3: Time
       if (cells[3]?.content?.[0]?.startIndex !== undefined) {
-        populateRequests.push({
-          insertText: {
-            location: { index: cells[3].content[0].startIndex },
-            text: comp.timeStructure
-          }
+        cellInsertions.push({
+          index: cells[3].content[0].startIndex,
+          text: comp.timeStructure
         });
       }
       
@@ -292,14 +287,23 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
         const equipmentText = peula.availableMaterials && peula.availableMaterials.length > 0 
           ? peula.availableMaterials.join(', ')
           : 'N/A';
-        populateRequests.push({
-          insertText: {
-            location: { index: cells[4].content[0].startIndex },
-            text: equipmentText
-          }
+        cellInsertions.push({
+          index: cells[4].content[0].startIndex,
+          text: equipmentText
         });
       }
     });
+    
+    // Sort by index in DESCENDING order and create requests
+    // This ensures that inserting text doesn't shift indices of cells we haven't processed yet
+    cellInsertions.sort((a, b) => b.index - a.index);
+    
+    const populateRequests = cellInsertions.map(cell => ({
+      insertText: {
+        location: { index: cell.index },
+        text: cell.text
+      }
+    }));
     
     // Apply all text insertions
     if (populateRequests.length > 0) {
