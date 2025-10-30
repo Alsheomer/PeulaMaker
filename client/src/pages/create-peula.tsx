@@ -371,20 +371,21 @@ export default function CreatePeula() {
               </Card>
             ) : null}
 
-            {/* Navigation Buttons */}
-            <div className="flex justify-between items-center pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleBack}
-                disabled={!canGoBack || generateMutation.isPending}
-                data-testid="button-back"
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
+            {/* Navigation Buttons - Hidden on Step 1 (Template Selection) */}
+            {currentStep > 1 && (
+              <div className="flex justify-between items-center pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  disabled={!canGoBack || generateMutation.isPending}
+                  data-testid="button-back"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
 
-              {currentStep === TOTAL_STEPS ? (
+                {currentStep === TOTAL_STEPS ? (
                 <Button
                   type="submit"
                   disabled={generateMutation.isPending}
@@ -414,7 +415,8 @@ export default function CreatePeula() {
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               )}
-            </div>
+              </div>
+            )}
           </form>
         </Form>
       </div>
