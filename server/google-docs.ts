@@ -1,12 +1,13 @@
 import { google } from 'googleapis';
 import type { Peula, PeulaContent } from "@shared/schema";
 
-// Reference: blueprint:google-docs
-let connectionSettings: any;
+// Reference: blueprint:google-docs and blueprint:google-drive
+let docsConnectionSettings: any;
+let driveConnectionSettings: any;
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
+async function getDocsAccessToken() {
+  if (docsConnectionSettings && docsConnectionSettings.settings.expires_at && new Date(docsConnectionSettings.settings.expires_at).getTime() > Date.now()) {
+    return docsConnectionSettings.settings.access_token;
   }
   
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -20,7 +21,7 @@ async function getAccessToken() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
+  docsConnectionSettings = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-docs',
     {
       headers: {
@@ -30,10 +31,44 @@ async function getAccessToken() {
     }
   ).then(res => res.json()).then(data => data.items?.[0]);
 
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
+  const accessToken = docsConnectionSettings?.settings?.access_token || docsConnectionSettings.settings?.oauth?.credentials?.access_token;
 
-  if (!connectionSettings || !accessToken) {
+  if (!docsConnectionSettings || !accessToken) {
     throw new Error('Google Docs not connected');
+  }
+  return accessToken;
+}
+
+async function getDriveAccessToken() {
+  if (driveConnectionSettings && driveConnectionSettings.settings.expires_at && new Date(driveConnectionSettings.settings.expires_at).getTime() > Date.now()) {
+    return driveConnectionSettings.settings.access_token;
+  }
+  
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (!xReplitToken) {
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  }
+
+  driveConnectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-drive',
+    {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    }
+  ).then(res => res.json()).then(data => data.items?.[0]);
+
+  const accessToken = driveConnectionSettings?.settings?.access_token || driveConnectionSettings.settings?.oauth?.credentials?.access_token;
+
+  if (!driveConnectionSettings || !accessToken) {
+    throw new Error('Google Drive not connected');
   }
   return accessToken;
 }
@@ -42,7 +77,7 @@ async function getAccessToken() {
 // Access tokens expire, so a new client must be created each time.
 // Always call this function again to get a fresh client.
 async function getUncachableGoogleDocsClient() {
-  const accessToken = await getAccessToken();
+  const accessToken = await getDocsAccessToken();
 
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({
@@ -53,7 +88,7 @@ async function getUncachableGoogleDocsClient() {
 }
 
 async function getUncachableGoogleDriveClient() {
-  const accessToken = await getAccessToken();
+  const accessToken = await getDriveAccessToken();
 
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({
