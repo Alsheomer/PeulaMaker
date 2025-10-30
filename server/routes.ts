@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generatePeula, regenerateSection } from "./ai";
-import { exportPeulaToGoogleDocs } from "./google-docs";
+import { exportPeulaToGoogleDocs, importGoogleDocsContent } from "./google-docs";
 import { questionnaireResponseSchema, insertFeedbackSchema, insertTrainingExampleSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -229,6 +229,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting training example:", error);
       res.status(500).json({ error: "Failed to delete training example" });
+    }
+  });
+
+  // Import training example from Google Docs
+  app.post("/api/training-examples/import-from-docs", async (req, res) => {
+    try {
+      const { url, notes } = req.body;
+      
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ error: "Google Docs URL is required" });
+      }
+
+      // Extract document ID from URL
+      // Supports formats:
+      // https://docs.google.com/document/d/DOCUMENT_ID/edit
+      // https://docs.google.com/document/d/DOCUMENT_ID
+      const docIdMatch = url.match(/\/document\/d\/([a-zA-Z0-9-_]+)/);
+      if (!docIdMatch) {
+        return res.status(400).json({ error: "Invalid Google Docs URL format" });
+      }
+
+      const documentId = docIdMatch[1];
+
+      // Import content from Google Docs
+      const { title, content } = await importGoogleDocsContent(documentId);
+
+      // Create training example with imported content
+      const newExample = await storage.createTrainingExample({
+        content,
+        notes: notes || `Imported from: ${title}`
+      });
+
+      res.json(newExample);
+    } catch (error) {
+      console.error("Error importing training example from Google Docs:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to import from Google Docs" 
+      });
     }
   });
 
