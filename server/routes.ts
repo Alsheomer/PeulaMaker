@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generatePeula, regenerateSection } from "./ai";
 import { exportPeulaToGoogleDocs } from "./google-docs";
-import { questionnaireResponseSchema, insertFeedbackSchema } from "@shared/schema";
+import { questionnaireResponseSchema, insertFeedbackSchema, insertTrainingExampleSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all peulot
@@ -188,6 +188,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting feedback:", error);
       res.status(500).json({ error: "Failed to delete feedback" });
+    }
+  });
+
+  // Get all training examples
+  app.get("/api/training-examples", async (_req, res) => {
+    try {
+      const examples = await storage.getAllTrainingExamples();
+      res.json(examples);
+    } catch (error) {
+      console.error("Error fetching training examples:", error);
+      res.status(500).json({ error: "Failed to fetch training examples" });
+    }
+  });
+
+  // Create new training example
+  app.post("/api/training-examples", async (req, res) => {
+    try {
+      const validation = insertTrainingExampleSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid training example data",
+          details: validation.error.errors 
+        });
+      }
+
+      const newExample = await storage.createTrainingExample(validation.data);
+      res.json(newExample);
+    } catch (error) {
+      console.error("Error creating training example:", error);
+      res.status(500).json({ error: "Failed to create training example" });
+    }
+  });
+
+  // Delete training example
+  app.delete("/api/training-examples/:id", async (req, res) => {
+    try {
+      await storage.deleteTrainingExample(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting training example:", error);
+      res.status(500).json({ error: "Failed to delete training example" });
     }
   });
 
