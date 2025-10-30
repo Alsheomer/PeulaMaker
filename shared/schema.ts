@@ -29,6 +29,7 @@ export type Peula = typeof peulot.$inferSelect;
 
 // Questionnaire response schema (for frontend state)
 export const questionnaireResponseSchema = z.object({
+  templateId: z.string().optional(),
   topic: z.string().min(1, "Topic is required"),
   ageGroup: z.string().min(1, "Age group is required"),
   duration: z.string().min(1, "Duration is required"),

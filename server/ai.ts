@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { QuestionnaireResponse, PeulaContent } from "@shared/schema";
+import { getTemplateById } from "@shared/templates";
 
 // This is using Replit's AI Integrations service, which provides OpenAI-compatible API access without requiring your own OpenAI API key.
 // Reference: blueprint:javascript_openai_ai_integrations
@@ -9,6 +10,12 @@ const openai = new OpenAI({
 });
 
 export async function generatePeula(responses: QuestionnaireResponse): Promise<{ title: string; content: PeulaContent }> {
+  const templateId = responses.templateId || "custom";
+  const template = getTemplateById(templateId);
+  const templateContext = template && template.id !== "custom" 
+    ? `\nTemplate Used: ${template.name} - ${template.description}` 
+    : "";
+
   const prompt = `You are an expert Tzofim (Israeli Scouts) educational facilitator creating a detailed peula (activity plan).
 
 Input Information:
@@ -16,7 +23,7 @@ Topic: ${responses.topic}
 Age: ${responses.ageGroup} years
 Duration: ${responses.duration} minutes
 Group Size: ${responses.groupSize}
-Goals: ${responses.goals}
+Goals: ${responses.goals}${templateContext}
 ${responses.availableMaterials && responses.availableMaterials.length > 0 ? `Available Materials: ${responses.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
 ${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}
 

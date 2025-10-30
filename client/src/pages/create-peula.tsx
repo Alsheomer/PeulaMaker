@@ -10,18 +10,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, Users, UsersRound, Heart, TreePine, Star, Lightbulb, Handshake } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import type { Peula } from "@shared/schema";
+import { peulaTemplates, getTemplateById } from "@shared/templates";
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
+
+const iconMap = {
+  Sparkles,
+  Users,
+  UsersRound,
+  Heart,
+  TreePine,
+  Star,
+  Lightbulb,
+  Handshake,
+};
 
 const questions = [
   {
-    step: 1,
+    step: 2,
     field: "topic" as const,
     title: "Topic or theme",
     description: "What topic or value would you like to explore?",
@@ -29,7 +41,7 @@ const questions = [
     placeholder: "e.g., leadership, teamwork, identity, community...",
   },
   {
-    step: 2,
+    step: 3,
     field: "ageGroup" as const,
     title: "Age group",
     description: "Select the age range of participants",
@@ -43,7 +55,7 @@ const questions = [
     ],
   },
   {
-    step: 3,
+    step: 4,
     field: "duration" as const,
     title: "Duration",
     description: "How much time is available for this activity?",
@@ -56,7 +68,7 @@ const questions = [
     ],
   },
   {
-    step: 4,
+    step: 5,
     field: "groupSize" as const,
     title: "Group size",
     description: "Number of participants",
@@ -69,7 +81,7 @@ const questions = [
     ],
   },
   {
-    step: 5,
+    step: 6,
     field: "goals" as const,
     title: "Goals and outcomes",
     description: "What should participants gain from this activity?",
@@ -77,7 +89,7 @@ const questions = [
     placeholder: "Describe what you'd like participants to learn, understand, or experience...",
   },
   {
-    step: 6,
+    step: 7,
     field: "availableMaterials" as const,
     title: "Available materials",
     description: "Select resources you have access to (optional)",
@@ -96,7 +108,7 @@ const questions = [
     ],
   },
   {
-    step: 7,
+    step: 8,
     field: "specialConsiderations" as const,
     title: "Additional notes",
     description: "Any other information we should know? (optional)",
@@ -107,11 +119,13 @@ const questions = [
 
 export default function CreatePeula() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>("custom");
   const [, setLocation] = useLocation();
   
   const form = useForm<QuestionnaireResponse>({
     resolver: zodResolver(questionnaireResponseSchema),
     defaultValues: {
+      templateId: "custom",
       topic: "",
       ageGroup: "",
       duration: "",
@@ -121,6 +135,20 @@ export default function CreatePeula() {
       specialConsiderations: "",
     },
   });
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    form.setValue("templateId", templateId);
+    const template = getTemplateById(templateId);
+    if (template && templateId !== "custom") {
+      form.setValue("topic", template.topic);
+      form.setValue("goals", template.goals);
+    } else {
+      form.setValue("topic", "");
+      form.setValue("goals", "");
+    }
+    setCurrentStep(2);
+  };
 
   const generateMutation = useMutation({
     mutationFn: async (data: QuestionnaireResponse) => {
@@ -132,12 +160,13 @@ export default function CreatePeula() {
     },
   });
 
-  const currentQuestion = questions.find(q => q.step === currentStep)!;
+  const currentQuestion = questions.find(q => q.step === currentStep);
   const progress = (currentStep / TOTAL_STEPS) * 100;
   const canGoNext = currentStep < TOTAL_STEPS;
   const canGoBack = currentStep > 1;
 
   const handleNext = async () => {
+    if (!currentQuestion) return;
     const field = currentQuestion.field;
     const isValid = await form.trigger(field);
     
@@ -172,18 +201,60 @@ export default function CreatePeula() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Question Card */}
-            <Card className="p-8">
-              <div className="mb-6">
-                <h1 className="text-2xl font-semibold text-foreground mb-2">
-                  {currentQuestion.title}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {currentQuestion.description}
-                </p>
-              </div>
+            {/* Template Selection (Step 1) */}
+            {currentStep === 1 ? (
+              <div className="space-y-6">
+                <div className="mb-6 text-center">
+                  <h1 className="text-3xl font-semibold text-foreground mb-3">
+                    Choose a Template
+                  </h1>
+                  <p className="text-base text-muted-foreground">
+                    Select a template to get started, or create a custom peula from scratch
+                  </p>
+                </div>
 
-              {currentQuestion.type === "text" ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {peulaTemplates.map((template) => {
+                    const IconComponent = iconMap[template.icon as keyof typeof iconMap];
+                    return (
+                      <Card
+                        key={template.id}
+                        className={`p-6 cursor-pointer transition-all hover-elevate ${
+                          selectedTemplate === template.id ? "border-primary bg-accent/30" : ""
+                        }`}
+                        onClick={() => handleTemplateSelect(template.id)}
+                        data-testid={`template-${template.id}`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="p-3 rounded-md bg-primary/10">
+                            <IconComponent className="w-6 h-6 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              {template.name}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {template.description}
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : currentQuestion ? (
+              <Card className="p-8">
+                <div className="mb-6">
+                  <h1 className="text-2xl font-semibold text-foreground mb-2">
+                    {currentQuestion.title}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {currentQuestion.description}
+                  </p>
+                </div>
+
+                {currentQuestion.type === "text" ? (
                 <FormField
                   control={form.control}
                   name={currentQuestion.field}
@@ -297,7 +368,8 @@ export default function CreatePeula() {
                   )}
                 />
               ) : null}
-            </Card>
+              </Card>
+            ) : null}
 
             {/* Navigation Buttons */}
             <div className="flex justify-between items-center pt-4">
