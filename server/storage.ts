@@ -58,7 +58,13 @@ export class MemStorage implements IStorage {
   async createPeula(insertPeula: InsertPeula): Promise<Peula> {
     const id = randomUUID();
     const createdAt = new Date().toISOString();
-    const peula: Peula = { ...insertPeula, id, createdAt };
+    const peula: Peula = { 
+      ...insertPeula, 
+      id, 
+      createdAt,
+      availableMaterials: insertPeula.availableMaterials ?? null,
+      specialConsiderations: insertPeula.specialConsiderations ?? null,
+    };
     this.peulot.set(id, peula);
     return peula;
   }
@@ -83,7 +89,11 @@ export class DbStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      ...insertUser, 
+      id,
+      password: insertUser.password ?? null,
+    };
     await db.insert(users).values(user);
     return user;
   }
@@ -101,7 +111,13 @@ export class DbStorage implements IStorage {
   async createPeula(insertPeula: InsertPeula): Promise<Peula> {
     const id = randomUUID();
     const createdAt = new Date().toISOString();
-    const peula: Peula = { ...insertPeula, id, createdAt };
+    const peula: Peula = { 
+      ...insertPeula, 
+      id, 
+      createdAt,
+      availableMaterials: insertPeula.availableMaterials ?? null,
+      specialConsiderations: insertPeula.specialConsiderations ?? null,
+    };
     await db.insert(peulot).values(peula);
     return peula;
   }

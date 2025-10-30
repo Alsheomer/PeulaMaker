@@ -198,13 +198,14 @@ export default function CreatePeula() {
                         />
                       ) : currentQuestion.type === "textarea" ? (
                         <Textarea
-                          {...field}
+                          value={field.value as string}
+                          onChange={field.onChange}
                           placeholder={currentQuestion.placeholder}
                           className="min-h-32 text-base resize-y"
                           data-testid={`textarea-${currentQuestion.field}`}
                         />
                       ) : currentQuestion.type === "select" ? (
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value as string}>
                           <SelectTrigger 
                             className="text-base"
                             data-testid={`select-${currentQuestion.field}`}
