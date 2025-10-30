@@ -257,8 +257,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create training example with imported content
       const newExample = await storage.createTrainingExample({
+        title,
         content,
-        notes: notes || `Imported from: ${title}`
+        notes: notes || `Imported from Google Docs`
       });
 
       res.json(newExample);

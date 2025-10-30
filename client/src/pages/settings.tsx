@@ -7,13 +7,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, BookOpen } from "lucide-react";
+import { Trash2, Plus, BookOpen, FileText } from "lucide-react";
 import type { TrainingExample } from "@shared/schema";
 
 export default function Settings() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [notes, setNotes] = useState("");
+  const [googleDocsUrl, setGoogleDocsUrl] = useState("");
+  const [googleDocsNotes, setGoogleDocsNotes] = useState("");
   const { toast } = useToast();
 
   const { data: examples = [], isLoading } = useQuery<TrainingExample[]>({
@@ -63,6 +65,28 @@ export default function Settings() {
     },
   });
 
+  const importFromDocsMutation = useMutation({
+    mutationFn: async (data: { url: string; notes?: string }) => {
+      return await apiRequest("POST", "/api/training-examples/import-from-docs", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/training-examples"] });
+      setGoogleDocsUrl("");
+      setGoogleDocsNotes("");
+      toast({
+        title: "Import Successful",
+        description: "Training example imported from Google Docs",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
@@ -76,6 +100,22 @@ export default function Settings() {
     createMutation.mutate({ title, content, notes: notes || undefined });
   };
 
+  const handleGoogleDocsImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleDocsUrl.trim()) {
+      toast({
+        title: "Missing URL",
+        description: "Please provide a Google Docs URL",
+        variant: "destructive",
+      });
+      return;
+    }
+    importFromDocsMutation.mutate({ 
+      url: googleDocsUrl, 
+      notes: googleDocsNotes || undefined 
+    });
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-8">
@@ -85,15 +125,65 @@ export default function Settings() {
         </p>
       </div>
 
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Import from Google Docs
+          </CardTitle>
+          <CardDescription>
+            Import a peula directly from Google Docs by pasting its URL
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleGoogleDocsImport} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="google-docs-url">Google Docs URL</Label>
+              <Input
+                id="google-docs-url"
+                data-testid="input-google-docs-url"
+                placeholder="https://docs.google.com/document/d/..."
+                value={googleDocsUrl}
+                onChange={(e) => setGoogleDocsUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Make sure the document is shared with "Anyone with the link can view"
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="google-docs-notes">Notes (Optional)</Label>
+              <Textarea
+                id="google-docs-notes"
+                data-testid="input-google-docs-notes"
+                placeholder="e.g., This example demonstrates excellent reflection techniques..."
+                value={googleDocsNotes}
+                onChange={(e) => setGoogleDocsNotes(e.target.value)}
+                className="min-h-[60px]"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              data-testid="button-import-from-docs"
+              disabled={importFromDocsMutation.isPending}
+              className="w-full"
+            >
+              {importFromDocsMutation.isPending ? "Importing..." : "Import from Google Docs"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5" />
-              Upload Training Example
+              Manual Upload
             </CardTitle>
             <CardDescription>
-              Add a peula you've written to help the AI learn your style
+              Paste the text of a peula you've written
             </CardDescription>
           </CardHeader>
           <CardContent>
