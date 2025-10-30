@@ -1,0 +1,97 @@
+Perfect — here’s the refined teaching framework for your Peula AI-Writer, now without sections 7 and 8 (no Apps Script or user prompt template).
+
+⸻
+
+How to teach the AI model to write peulot that look exactly like your example
+
+1) Lock the output format (Hebrew + table + minutes + gear)
+
+Tell the model to output only this table, with no intro or notes:
+
+סוג הזמן | שם | הסבר/תוכן | זמן | ציוד והערות
+
+	•	Write everything in Hebrew, right-to-left.
+	•	Keep rows short (1–3 sentences, imperative verbs).
+	•	Time always formatted as “10 דק׳”.
+	•	ציוד והערות = only gear lists or 1-line safety notes, not explanations.
+
+⸻
+
+2) Give the model fixed guardrails
+
+Add these to the system instructions every time:
+	•	“כתוב בעברית בלבד. החזר טבלה אחת עם העמודות: סוג הזמן | שם | הסבר/תוכן | זמן | ציוד והערות.”
+	•	“כל שורה היא הוראה מעשית בגוף שני רבים (‘תרכזו’, ‘תסדרו’). אין תיאוריה.”
+	•	“יש לכלול תנועה כל ≤ 12 דק׳, שלב בטיחות לפני פעילות פיזית, וסיים בשגרה ומסלול.”
+	•	“הוסף שאלות דיבריף קצרות (‘לשאול שאלות…’) בסוף משחקים או אתגרים.”
+	•	“הזמן חייב לכלול ‘דק׳’, והציוד רשימה קצרה.”
+	•	“אין טקסט לפני או אחרי הטבלה.”
+
+⸻
+
+3) Provide the generator variables
+
+Supply only these structured inputs each time (the AI fills the table):
+
+שדה	דוגמה
+גיל	15–17
+משך	90 דק׳
+גודל קבוצה	5–10
+מקום	שטח פתוח
+אנרגיה	בינונית
+נושא	הנהגה ואחריות
+שאלה מנחה	“מתי נכון לקחת פיקוד ומתי לשחרר?”
+חובה לכלול	סבב תפקידים, דגל מחויבות
+הימנע	ריצה או הרמות
+עוגן מסלול	תכנון הובלה לאירוע השבט
+
+
+⸻
+
+4) Give one “style-shard” (few-shot sample)
+
+Show a mini example to anchor the model’s tone and density:
+
+סוג הזמן | שם | הסבר/תוכן | זמן | ציוד והערות
+סבב פתיחה | היכרות קצרה | כל אחד משתף רגע חזק מהשבוע. מדריך מסכם את כללי הפעולה. | 10 דק׳ | ללא
+משחק | מחסן רמזים | מסמנים אזור. מפזרים 10 פתקים. מתחלקים ל-6–8. לידר מתחלף כל דקה. דיבריף: "מי הנהיג?", "מה שיפר את שיתוף הפעולה?" | 20 דק׳ | פתקים, טיימר, מים
+דיון | סרטון השראה | צופים בקטע קצר. שאלה לפני: "איך זה מתחבר לנושא?". לאחר מכן 3 תגובות קצרות. | 5 דק׳ | טלפון + רמקול
+שיחה | לקראת השנה | סבב סיכום. כל משתתף מציין לקח ואתגר לאירוע השבט. | 10 דק׳ | ללא
+מפקד | סגירת פעולה | תזכורת תפקידים וציוד למפגש הבא. | 5 דק׳ | דגל, רשימת תפקידים
+
+The model will mirror this structure—short imperative lines, precise minutes, gear column concise, Hebrew labels identical.
+
+⸻
+
+5) Add a micro post-processor (quality safety net)
+
+Use spreadsheet formulas or a simple script after generation to enforce:
+	•	Reflection ≥ 20 % of total time → if not, append an 8-דק׳ “שיחה סיכום HHH”.
+	•	Movement cadence → ensure an active block (משחק/אתגר/בנייה) starts at least every 12 min; if not, insert 90-ש׳ “מתחמם זריז”.
+	•	Safety step → if any row includes חבל / ריצה / מסלול / כדורים and no “כללי בטיחות” note, append one automatically.
+
+⸻
+
+6) The full system prompt you keep
+
+את/ה מרכז/ת בוגרת בצופים. כתוב פעולה בעברית בלבד,
+בטבלה אחת עם העמודות: סוג הזמן | שם | הסבר/תוכן | זמן | ציוד והערות.
+הטון: הוראות קצרות, ספציפיות, בגוף שני רבים. כל מקטע מסתיים
+בשאלות דיבריף אם רלוונטי. כל ≤ 12 דק׳ יש תנועה, לפני פעילות פיזית הוסף
+שורת בטיחות, ובסוף שגרה ומסלול עם בעלי תפקידים ודדליינים.
+אין טקסט מחוץ לטבלה ואין הסברים פדגוגיים.
+
+
+⸻
+
+9) Quality checklist (what you confirm after each generation)
+	1.	Columns appear exactly once; all text Hebrew, no preamble.
+	2.	Every ≤ 12 minutes → active segment present.
+	3.	“שגרה” + “מסלול” rows exist at the end.
+	4.	Physical blocks include a safety note in ציוד והערות.
+	5.	Short imperative sentences (not paragraphs).
+	6.	At least one “לשאול שאלות” debrief prompt.
+
+⸻
+
+Follow these six sections and your AI will output peulot in the clean, scout-professional table style—just like your uploaded image—every single time.
