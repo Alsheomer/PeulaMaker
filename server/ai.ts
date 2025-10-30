@@ -17,6 +17,21 @@ export async function generatePeula(responses: QuestionnaireResponse): Promise<{
     ? `\nTemplate Used: ${template.name} - ${template.description}` 
     : "";
 
+  // Fetch training examples to learn user's writing style
+  const trainingExamples = await storage.getAllTrainingExamples();
+  let trainingContext = "";
+  if (trainingExamples.length > 0) {
+    trainingContext = "\n\nTraining Examples (Peulot you've written - match this writing style and quality):\n\n";
+    trainingExamples.slice(0, 3).forEach((example, idx) => {
+      trainingContext += `Example ${idx + 1}: ${example.title}\n`;
+      trainingContext += `${example.content.slice(0, 1000)}${example.content.length > 1000 ? '...' : ''}\n`;
+      if (example.notes) {
+        trainingContext += `Notes: ${example.notes}\n`;
+      }
+      trainingContext += "\n";
+    });
+  }
+
   // Fetch all feedback to learn from past peulot
   const allFeedback = await storage.getAllFeedback();
   
@@ -65,9 +80,13 @@ Duration: ${responses.duration} minutes
 Group Size: ${responses.groupSize}
 Goals: ${responses.goals}${templateContext}
 ${responses.availableMaterials && responses.availableMaterials.length > 0 ? `Available Materials: ${responses.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
-${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}${feedbackContext}
+${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}${trainingContext}${feedbackContext}
 
-Create a professional, actionable peula with these 9 components. Be specific, practical, and aligned with Tzofim educational values. If feedback is provided above, use it to improve the quality of this peula by addressing common concerns and incorporating successful practices.
+Create a professional, actionable peula with these 9 components. Be specific, practical, and aligned with Tzofim educational values.
+
+${trainingExamples.length > 0 ? 'IMPORTANT: Study the training examples above and match the writing style, tone, structure, and level of detail shown in those examples. Create a peula that feels consistent with the user\'s own writing.' : ''}
+
+${allFeedback.length > 0 ? 'Also use the feedback provided above to improve the quality of this peula by addressing common concerns and incorporating successful practices.' : ''}
 
 For each component provide:
 - Description: Clear, actionable content
