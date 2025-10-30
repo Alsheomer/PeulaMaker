@@ -3,15 +3,17 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Edit, ArrowLeft, Loader2 } from "lucide-react";
+import { Download, Edit, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Peula, PeulaContent } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function PeulaView() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [regeneratingSection, setRegeneratingSection] = useState<number | null>(null);
 
   const { data: peula, isLoading } = useQuery<Peula>({
     queryKey: ["/api/peulot", id],
@@ -21,7 +23,7 @@ export default function PeulaView() {
   const exportMutation = useMutation({
     mutationFn: async (peulaId: string) => {
       const response = await apiRequest("POST", `/api/peulot/${peulaId}/export`, {});
-      return response as { documentUrl: string };
+      return await response.json() as { documentUrl: string };
     },
     onSuccess: (data) => {
       toast({
@@ -40,6 +42,35 @@ export default function PeulaView() {
       });
     },
   });
+
+  const regenerateMutation = useMutation({
+    mutationFn: async ({ peulaId, sectionIndex }: { peulaId: string; sectionIndex: number }) => {
+      const response = await apiRequest("POST", `/api/peulot/${peulaId}/regenerate-section`, { sectionIndex });
+      return await response.json() as Peula;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/peulot", id] });
+      toast({
+        title: "Section Regenerated",
+        description: "The section has been successfully regenerated with new content.",
+      });
+      setRegeneratingSection(null);
+    },
+    onError: () => {
+      toast({
+        title: "Regeneration Failed",
+        description: "There was an error regenerating the section. Please try again.",
+        variant: "destructive",
+      });
+      setRegeneratingSection(null);
+    },
+  });
+
+  const handleRegenerateSection = (sectionIndex: number) => {
+    if (!id) return;
+    setRegeneratingSection(sectionIndex);
+    regenerateMutation.mutate({ peulaId: id, sectionIndex });
+  };
 
   if (isLoading) {
     return (
@@ -138,14 +169,17 @@ export default function PeulaView() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-muted/50 border-b border-border">
-                  <th className="text-left p-4 font-medium text-sm text-foreground w-[30%]">
+                  <th className="text-left p-4 font-medium text-sm text-foreground w-[28%]">
                     Peula Component
                   </th>
-                  <th className="text-left p-4 font-medium text-sm text-foreground w-[40%]">
+                  <th className="text-left p-4 font-medium text-sm text-foreground w-[38%]">
                     Description & Guidelines
                   </th>
-                  <th className="text-left p-4 font-medium text-sm text-foreground w-[30%]">
+                  <th className="text-left p-4 font-medium text-sm text-foreground w-[28%]">
                     Tzofim Best Practices & Time
+                  </th>
+                  <th className="text-center p-4 font-medium text-sm text-foreground w-[6%]">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -178,6 +212,22 @@ export default function PeulaView() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="p-4 align-top text-center">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleRegenerateSection(index)}
+                        disabled={regeneratingSection === index}
+                        title="Regenerate this section"
+                        data-testid={`button-regenerate-${index}`}
+                      >
+                        {regeneratingSection === index ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4" />
+                        )}
+                      </Button>
                     </td>
                   </tr>
                 ))}

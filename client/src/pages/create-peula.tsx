@@ -183,51 +183,84 @@ export default function CreatePeula() {
                 </p>
               </div>
 
-              <FormField
-                control={form.control}
-                name={currentQuestion.field}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      {currentQuestion.type === "text" ? (
+              {currentQuestion.type === "text" ? (
+                <FormField
+                  control={form.control}
+                  name={currentQuestion.field}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
                         <Input
                           {...field}
                           placeholder={currentQuestion.placeholder}
                           className="text-base"
                           data-testid={`input-${currentQuestion.field}`}
                         />
-                      ) : currentQuestion.type === "textarea" ? (
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : currentQuestion.type === "textarea" ? (
+                <FormField
+                  control={form.control}
+                  name={currentQuestion.field}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
                         <Textarea
-                          value={field.value as string}
+                          value={field.value as string || ""}
                           onChange={field.onChange}
                           placeholder={currentQuestion.placeholder}
                           className="min-h-32 text-base resize-y"
                           data-testid={`textarea-${currentQuestion.field}`}
                         />
-                      ) : currentQuestion.type === "select" ? (
-                        <Select onValueChange={field.onChange} value={field.value as string}>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : currentQuestion.type === "select" ? (
+                <FormField
+                  control={form.control}
+                  name={currentQuestion.field}
+                  render={({ field }) => (
+                    <FormItem>
+                      <Select onValueChange={field.onChange} value={field.value as string || ""}>
+                        <FormControl>
                           <SelectTrigger 
                             className="text-base"
                             data-testid={`select-${currentQuestion.field}`}
                           >
                             <SelectValue placeholder="Select an option..." />
                           </SelectTrigger>
-                          <SelectContent>
-                            {currentQuestion.options?.map((option) => (
-                              <SelectItem 
-                                key={option.value} 
-                                value={option.value}
-                                data-testid={`option-${option.value}`}
-                              >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : currentQuestion.type === "checkbox" ? (
+                        </FormControl>
+                        <SelectContent>
+                          {currentQuestion.options?.map((option) => (
+                            <SelectItem 
+                              key={option.value} 
+                              value={option.value}
+                              data-testid={`option-${option.value}`}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : currentQuestion.type === "checkbox" ? (
+                <FormField
+                  control={form.control}
+                  name={currentQuestion.field}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
                         <div className="space-y-3">
                           {currentQuestion.options?.map((option) => {
-                            const values = field.value as string[] || [];
+                            const values = (field.value as string[]) || [];
                             const isChecked = values.includes(option.value);
                             
                             return (
@@ -258,12 +291,12 @@ export default function CreatePeula() {
                             </p>
                           )}
                         </div>
-                      ) : null}
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : null}
             </Card>
 
             {/* Navigation Buttons */}

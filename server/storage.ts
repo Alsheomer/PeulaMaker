@@ -14,6 +14,7 @@ export interface IStorage {
   getPeula(id: string): Promise<Peula | undefined>;
   getAllPeulot(): Promise<Peula[]>;
   createPeula(peula: InsertPeula): Promise<Peula>;
+  updatePeula(id: string, updates: Partial<InsertPeula>): Promise<Peula | undefined>;
   deletePeula(id: string): Promise<void>;
 }
 
@@ -69,6 +70,20 @@ export class MemStorage implements IStorage {
     return peula;
   }
 
+  async updatePeula(id: string, updates: Partial<InsertPeula>): Promise<Peula | undefined> {
+    const existing = this.peulot.get(id);
+    if (!existing) return undefined;
+    
+    const updated: Peula = {
+      ...existing,
+      ...updates,
+      availableMaterials: updates.availableMaterials ?? existing.availableMaterials,
+      specialConsiderations: updates.specialConsiderations ?? existing.specialConsiderations,
+    };
+    this.peulot.set(id, updated);
+    return updated;
+  }
+
   async deletePeula(id: string): Promise<void> {
     this.peulot.delete(id);
   }
@@ -120,6 +135,21 @@ export class DbStorage implements IStorage {
     };
     await db.insert(peulot).values(peula);
     return peula;
+  }
+
+  async updatePeula(id: string, updates: Partial<InsertPeula>): Promise<Peula | undefined> {
+    const existing = await this.getPeula(id);
+    if (!existing) return undefined;
+    
+    const updated: Peula = {
+      ...existing,
+      ...updates,
+      availableMaterials: updates.availableMaterials ?? existing.availableMaterials,
+      specialConsiderations: updates.specialConsiderations ?? existing.specialConsiderations,
+    };
+    
+    await db.update(peulot).set(updated).where(eq(peulot.id, id));
+    return updated;
   }
 
   async deletePeula(id: string): Promise<void> {

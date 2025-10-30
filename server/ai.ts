@@ -139,3 +139,78 @@ Return valid JSON:
     throw new Error("Failed to generate peula. Please try again.");
   }
 }
+
+export async function regenerateSection(
+  sectionIndex: number,
+  sectionName: string,
+  context: {
+    topic: string;
+    ageGroup: string;
+    duration: string;
+    groupSize: string;
+    goals: string;
+    availableMaterials?: string[];
+    specialConsiderations?: string;
+  }
+): Promise<{ description: string; bestPractices: string; timeStructure: string }> {
+  const prompt = `You are regenerating a specific section of a Tzofim peula.
+
+Context:
+Topic: ${context.topic}
+Age: ${context.ageGroup}
+Duration: ${context.duration}
+Group Size: ${context.groupSize}
+Goals: ${context.goals}
+${context.availableMaterials && context.availableMaterials.length > 0 ? `Materials: ${context.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
+${context.specialConsiderations ? `Notes: ${context.specialConsiderations}` : ''}
+
+Regenerate ONLY this section: ${sectionName}
+
+Provide fresh, creative content for this specific component while staying aligned with the context above. Be specific, actionable, and professional.
+
+Return valid JSON:
+{
+  "description": "Clear, actionable content for this section",
+  "bestPractices": "Tzofim methodology and tips",
+  "timeStructure": "Specific time breakdown"
+}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert Tzofim activity planner. Generate fresh, specific content for the requested section. Always respond with valid JSON."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 2048,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("No content received from AI");
+    }
+
+    const parsed = JSON.parse(content);
+    
+    if (!parsed.description || !parsed.bestPractices || !parsed.timeStructure) {
+      throw new Error("Invalid response structure from AI");
+    }
+
+    return {
+      description: parsed.description,
+      bestPractices: parsed.bestPractices,
+      timeStructure: parsed.timeStructure
+    };
+  } catch (error) {
+    console.error("Error regenerating section:", error);
+    throw new Error("Failed to regenerate section. Please try again.");
+  }
+}
+

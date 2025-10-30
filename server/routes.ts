@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { generatePeula } from "./ai";
+import { generatePeula, regenerateSection } from "./ai";
 import { exportPeulaToGoogleDocs } from "./google-docs";
 import { questionnaireResponseSchema } from "@shared/schema";
 
@@ -84,6 +84,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error exporting peula:", error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : "Failed to export peula" 
+      });
+    }
+  });
+
+  // Regenerate specific section of peula
+  app.post("/api/peulot/:id/regenerate-section", async (req, res) => {
+    try {
+      const peula = await storage.getPeula(req.params.id);
+      if (!peula) {
+        return res.status(404).json({ error: "Peula not found" });
+      }
+
+      const { sectionIndex } = req.body;
+      if (typeof sectionIndex !== "number" || sectionIndex < 0 || sectionIndex > 8) {
+        return res.status(400).json({ error: "Invalid section index" });
+      }
+
+      const content = peula.content as any;
+      const sectionName = content.components[sectionIndex].component;
+
+      // Regenerate the section
+      const newSection = await regenerateSection(sectionIndex, sectionName, {
+        topic: peula.topic,
+        ageGroup: peula.ageGroup,
+        duration: peula.duration,
+        groupSize: peula.groupSize,
+        goals: peula.goals,
+        availableMaterials: peula.availableMaterials || undefined,
+        specialConsiderations: peula.specialConsiderations || undefined,
+      });
+
+      // Update the section
+      content.components[sectionIndex] = {
+        component: sectionName,
+        ...newSection
+      };
+
+      // Save updated peula
+      const updated = await storage.updatePeula(peula.id, { content });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error regenerating section:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to regenerate section" 
       });
     }
   });
