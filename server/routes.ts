@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generatePeula, regenerateSection } from "./ai";
-import { exportPeulaToGoogleDocs, importGoogleDocsContent } from "./google-docs";
+import { exportPeulaToGoogleDocs, importGoogleDocsContent, listGoogleDocsFiles } from "./google-docs";
 import { questionnaireResponseSchema, insertFeedbackSchema, insertTrainingExampleSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -232,7 +232,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import training example from Google Docs
+  // List Google Docs files from Drive
+  app.get("/api/google-drive/docs", async (_req, res) => {
+    try {
+      const files = await listGoogleDocsFiles();
+      res.json(files);
+    } catch (error) {
+      console.error("Error listing Google Docs files:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to list Google Docs files" 
+      });
+    }
+  });
+
+  // Import training example from Google Docs by document ID
+  app.post("/api/training-examples/import-from-drive", async (req, res) => {
+    try {
+      const { documentId, notes } = req.body;
+      
+      if (!documentId || typeof documentId !== "string") {
+        return res.status(400).json({ error: "Document ID is required" });
+      }
+
+      // Import content from Google Docs
+      const { title, content } = await importGoogleDocsContent(documentId);
+
+      // Create training example with imported content
+      const newExample = await storage.createTrainingExample({
+        title,
+        content,
+        notes: notes || `Imported from Google Drive`
+      });
+
+      res.json(newExample);
+    } catch (error) {
+      console.error("Error importing training example from Drive:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to import from Drive" 
+      });
+    }
+  });
+
+  // Import training example from Google Docs URL
   app.post("/api/training-examples/import-from-docs", async (req, res) => {
     try {
       const { url, notes } = req.body;

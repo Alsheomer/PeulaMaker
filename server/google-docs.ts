@@ -340,6 +340,30 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
   }
 }
 
+export async function listGoogleDocsFiles(): Promise<Array<{ id: string; name: string; modifiedTime: string }>> {
+  try {
+    const drive = await getUncachableGoogleDriveClient();
+    
+    const response = await drive.files.list({
+      q: "mimeType = 'application/vnd.google-apps.document' and trashed = false",
+      spaces: 'drive',
+      fields: 'files(id, name, modifiedTime)',
+      orderBy: 'modifiedTime desc',
+      pageSize: 50
+    });
+
+    const files = response.data.files || [];
+    return files.map(file => ({
+      id: file.id || '',
+      name: file.name || 'Untitled',
+      modifiedTime: file.modifiedTime || ''
+    }));
+  } catch (error) {
+    console.error("Error listing Google Docs files:", error);
+    throw new Error("Failed to list Google Docs. Make sure Google Drive is connected.");
+  }
+}
+
 export async function importGoogleDocsContent(documentId: string): Promise<{ title: string; content: string }> {
   try {
     const docs = await getUncachableGoogleDocsClient();
