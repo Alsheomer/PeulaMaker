@@ -121,3 +121,117 @@ Preferred communication style: Simple, everyday language.
 5. **Shadcn/ui component approach:** Copy-paste components into codebase for full control and customization vs. NPM package dependency
 6. **JSONB for peula content:** Flexible schema for structured activity components while maintaining queryability
 7. **Replit AI Integrations:** Simplified AI integration without managing API keys directly
+
+## Recent Changes
+
+### Feedback System (Completed October 30, 2025)
+
+Implemented a complete feedback system that enables continuous AI improvement:
+
+**Database Schema:**
+- Added `feedback` table with fields: `id`, `peulaId`, `componentIndex`, `comment`, `createdAt`
+- Foreign key relationship with cascade delete to `peulot` table
+- Component index (0-8) tracks which of the 9 peula components the feedback relates to
+
+**Backend API:**
+- `GET /api/peulot/:id/feedback` - Retrieve all feedback for a specific peula
+- `POST /api/feedback` - Submit new feedback (with server-side validation for component index range)
+- `DELETE /api/feedback/:id` - Delete feedback
+- Storage interface extended with feedback CRUD methods in both MemStorage and DbStorage
+
+**Frontend UI:**
+- Each peula component has a feedback button (💬 icon) with badge showing comment count
+- Expandable feedback section displays existing comments and allows adding new ones
+- Feedback input uses controlled Textarea component with submit button
+- Toast notifications confirm successful feedback submission
+- Data fetching and mutations use TanStack Query with proper cache invalidation
+
+**AI Integration:**
+- `generatePeula()` fetches all feedback, groups by component, and includes last 5 comments per component in AI prompt
+- `regenerateSection()` fetches component-specific feedback and uses it to improve regenerated content
+- Prompt engineering instructs AI to learn from feedback and incorporate successful practices
+- Feedback context clearly labeled in prompts to guide AI learning
+
+**Quality Measures:**
+- Server-side validation ensures componentIndex is in valid range (0-8)
+- Feedback limited to 5 most recent comments per component to avoid prompt bloat
+- Proper error handling and user-friendly error messages
+- All interactive elements have data-testid attributes for testing
+
+## Future Enhancement Roadmap
+
+The following enhancements have been identified for future implementation to make the feedback system more sophisticated and effective:
+
+### Phase 1: Structured Feedback & Rating System
+- Replace free-text comments with structured feedback:
+  - Multi-dimensional ratings (1-5): overall, clarity, safety, inclusion
+  - Tag-based feedback with predefined chips: `too_long`, `missing_safety`, `weak_debrief`, `low_energy`, `unclear_roles`, `great_flow`, `scout_identity+`
+  - Suggested fixes field for concrete improvement recommendations
+  - Track implicit signals: section edits, time overruns, regeneration triggers
+
+### Phase 2: Online Learning with EMA Scoring
+- Implement exponential moving average (EMA) scoring for continuous learning:
+  - Maintain `method_stats` per (methodKey, topicKey, ageBand)
+  - Convert feedback to normalized reward ∈ [0,1] with tag-based penalties/bonuses
+  - Update scores online: `ema_score = (1-α)*ema_score + α*reward` (α=0.3)
+  - Track average duration and usage count per method
+
+### Phase 3: Thompson Sampling for Method Selection
+- Use Thompson Sampling bandit algorithm for exploration/exploitation:
+  - Maintain Beta distribution parameters (α, β) per method
+  - Sample scores and rank candidates while respecting hard constraints
+  - Balance exploration of new methods with exploitation of proven ones
+  - Small computational overhead, no model retraining required
+
+### Phase 4: Tag-Driven Automatic Fixes
+- Create deterministic tag→action mappings:
+  - `missing_safety` → prepend "Safety Hunt 60ש׳", enforce safety line in gear notes
+  - `too_long` → reduce word cap from 120→90, require rule cards
+  - `weak_debrief` → enforce 2 questions after games/challenges
+  - `low_energy` → insert 90-ש׳ energizer if 12-min gap without movement
+  - `unclear_roles` → force explicit role assignments in content
+
+### Phase 5: Post-Processing Quality Gate
+- Implement deterministic post-processor to ensure quality standards:
+  1. Retiming to match duration (never cut Reflection)
+  2. Safety injection for physical keywords (חבל/מסלול/כדורים/ריצה)
+  3. Movement gap detection and energizer insertion
+  4. Automatic Shigra + Maslul append if missing
+  5. Content linting: enforce word limits, concise gear lists
+
+### Phase 6: Dynamic Form Validation
+- Real-time validation with inline feedback:
+  - Hard rules (block generation): Reflection ≥20%, Movement cadence ≤12min, Shigra+Maslul present, Safety lines for physical activities
+  - Soft rules (warn): ≤120 words per section, debrief prompts after games, role assignments
+  - Live checklist with pass/fail indicators
+  - One-click fixes: "Add Shigra (3') + Maslul (2')", "Insert Safety Hunt 60-ש׳"
+
+### Phase 7: Team-Level Personalization
+- Per-shevet/team profile system:
+  - Customizable constraints: `reflection_min_pct` (0.20-0.30), `no_running` flag
+  - Preferred methods: `['stations', 'roleplay']`
+  - Language preference: Hebrew/English/mixed
+  - Apply as rule overrides and bandit priors
+
+### Phase 8: Robustness & Noise Filtering
+- Prevent noisy feedback from degrading quality:
+  - Time-weighted feedback: recent comments weighted higher
+  - Wilson lower bound for display ranking
+  - Outlier detection: drop top/bottom 1% for duration calculations
+  - Minimum feedback threshold (n≥5) before method dominates
+
+### Phase 9: Metrics & Evaluation Dashboard
+- Track continuous improvement with weekly metrics:
+  - Edit rate (% sections edited before running - should decrease)
+  - Regeneration rate (% sections regenerated - should decrease)
+  - Safety violation rate (should approach zero)
+  - Reflection coverage (median % - target ≥20%)
+  - User satisfaction: "I led at least once" (≥80%), "Process was clear" (≥80%)
+
+### Phase 10: Performance Optimizations
+- Micro-caching: reuse outputs for identical inputs within 24h (if no new feedback)
+- Single LLM call per peula (two only if hard validation fails)
+- Efficient feedback retrieval with database indexing
+- Lazy loading of feedback in UI
+
+**Implementation Priority:** These enhancements should be implemented incrementally, validating each phase with real user feedback before proceeding to the next. The current system provides a solid foundation for all future enhancements.
