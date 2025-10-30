@@ -7,8 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Plus, BookOpen, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Trash2, Plus, BookOpen, FileText, FolderOpen } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import type { TrainingExample } from "@shared/schema";
+
+interface DriveFile {
+  id: string;
+  name: string;
+  modifiedTime: string;
+}
 
 export default function Settings() {
   const [title, setTitle] = useState("");
@@ -16,6 +24,9 @@ export default function Settings() {
   const [notes, setNotes] = useState("");
   const [googleDocsUrl, setGoogleDocsUrl] = useState("");
   const [googleDocsNotes, setGoogleDocsNotes] = useState("");
+  const [driveDialogOpen, setDriveDialogOpen] = useState(false);
+  const [selectedDriveFile, setSelectedDriveFile] = useState<string | null>(null);
+  const [driveImportNotes, setDriveImportNotes] = useState("");
   const { toast } = useToast();
 
   const { data: examples = [], isLoading } = useQuery<TrainingExample[]>({
@@ -87,6 +98,34 @@ export default function Settings() {
     },
   });
 
+  const { data: driveFiles = [], isLoading: driveFilesLoading } = useQuery<DriveFile[]>({
+    queryKey: ["/api/google-drive/docs"],
+    enabled: driveDialogOpen,
+  });
+
+  const importFromDriveMutation = useMutation({
+    mutationFn: async (data: { documentId: string; notes?: string }) => {
+      return await apiRequest("POST", "/api/training-examples/import-from-drive", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/training-examples"] });
+      setDriveDialogOpen(false);
+      setSelectedDriveFile(null);
+      setDriveImportNotes("");
+      toast({
+        title: "Import Successful",
+        description: "Training example imported from Google Drive",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
@@ -116,6 +155,21 @@ export default function Settings() {
     });
   };
 
+  const handleDriveImport = () => {
+    if (!selectedDriveFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a document from your Drive",
+        variant: "destructive",
+      });
+      return;
+    }
+    importFromDriveMutation.mutate({
+      documentId: selectedDriveFile,
+      notes: driveImportNotes || undefined
+    });
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-8">
@@ -132,10 +186,100 @@ export default function Settings() {
             Import from Google Docs
           </CardTitle>
           <CardDescription>
-            Import a peula directly from Google Docs by pasting its URL
+            Browse your Drive or paste a document URL
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <Dialog open={driveDialogOpen} onOpenChange={setDriveDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                data-testid="button-browse-drive"
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                Browse Google Drive
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Select Document from Google Drive</DialogTitle>
+                <DialogDescription>
+                  Choose a Google Doc to import as a training example
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="flex-1 overflow-auto">
+                {driveFilesLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    Loading your Google Docs...
+                  </div>
+                ) : driveFiles.length === 0 ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    No Google Docs found in your Drive
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {driveFiles.map((file) => (
+                      <Card
+                        key={file.id}
+                        className={`cursor-pointer transition-colors ${
+                          selectedDriveFile === file.id ? "ring-2 ring-primary" : ""
+                        }`}
+                        onClick={() => setSelectedDriveFile(file.id)}
+                        data-testid={`drive-file-${file.id}`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <FileText className="w-5 h-5 text-muted-foreground mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium truncate">{file.name}</h4>
+                              <p className="text-xs text-muted-foreground">
+                                Modified {formatDistanceToNow(new Date(file.modifiedTime), { addSuffix: true })}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="drive-notes">Notes (Optional)</Label>
+                  <Textarea
+                    id="drive-notes"
+                    data-testid="input-drive-notes"
+                    placeholder="e.g., This example demonstrates excellent reflection..."
+                    value={driveImportNotes}
+                    onChange={(e) => setDriveImportNotes(e.target.value)}
+                    className="min-h-[60px]"
+                  />
+                </div>
+                <Button
+                  onClick={handleDriveImport}
+                  disabled={!selectedDriveFile || importFromDriveMutation.isPending}
+                  className="w-full"
+                  data-testid="button-import-selected"
+                >
+                  {importFromDriveMutation.isPending ? "Importing..." : "Import Selected Document"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or paste URL</span>
+            </div>
+          </div>
+
           <form onSubmit={handleGoogleDocsImport} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="google-docs-url">Google Docs URL</Label>
@@ -165,11 +309,11 @@ export default function Settings() {
 
             <Button
               type="submit"
-              data-testid="button-import-from-docs"
+              data-testid="button-import-from-url"
               disabled={importFromDocsMutation.isPending}
               className="w-full"
             >
-              {importFromDocsMutation.isPending ? "Importing..." : "Import from Google Docs"}
+              {importFromDocsMutation.isPending ? "Importing..." : "Import from URL"}
             </Button>
           </form>
         </CardContent>
