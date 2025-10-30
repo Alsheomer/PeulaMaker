@@ -28,6 +28,15 @@ export const feedback = pgTable("feedback", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+// Training examples for AI to learn from user's writing style
+export const trainingExamples = pgTable("training_examples", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(), // The full example peula text
+  notes: text("notes"), // Optional notes about what makes this example good
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
 export const insertPeulaSchema = createInsertSchema(peulot).omit({
   id: true,
   createdAt: true,
@@ -43,6 +52,14 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
 
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 export type Feedback = typeof feedback.$inferSelect;
+
+export const insertTrainingExampleSchema = createInsertSchema(trainingExamples).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTrainingExample = z.infer<typeof insertTrainingExampleSchema>;
+export type TrainingExample = typeof trainingExamples.$inferSelect;
 
 // Questionnaire response schema (for frontend state)
 export const questionnaireResponseSchema = z.object({

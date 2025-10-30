@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Peula, type InsertPeula, type Feedback, type InsertFeedback, users, peulot, feedback } from "@shared/schema";
+import { type User, type InsertUser, type Peula, type InsertPeula, type Feedback, type InsertFeedback, type TrainingExample, type InsertTrainingExample, users, peulot, feedback, trainingExamples } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc } from "drizzle-orm";
 import { db } from "./db";
@@ -22,17 +22,24 @@ export interface IStorage {
   getAllFeedback(): Promise<Feedback[]>;
   createFeedback(feedbackData: InsertFeedback): Promise<Feedback>;
   deleteFeedback(id: string): Promise<void>;
+  
+  // Training example methods
+  getAllTrainingExamples(): Promise<TrainingExample[]>;
+  createTrainingExample(example: InsertTrainingExample): Promise<TrainingExample>;
+  deleteTrainingExample(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private peulot: Map<string, Peula>;
   private feedback: Map<string, Feedback>;
+  private trainingExamples: Map<string, TrainingExample>;
 
   constructor() {
     this.users = new Map();
     this.peulot = new Map();
     this.feedback = new Map();
+    this.trainingExamples = new Map();
   }
 
   // User methods
@@ -115,6 +122,30 @@ export class MemStorage implements IStorage {
 
   async deleteFeedback(id: string): Promise<void> {
     this.feedback.delete(id);
+  }
+
+  // Training example methods
+  async getAllTrainingExamples(): Promise<TrainingExample[]> {
+    return Array.from(this.trainingExamples.values()).sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async createTrainingExample(insertExample: InsertTrainingExample): Promise<TrainingExample> {
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const example: TrainingExample = { 
+      ...insertExample, 
+      id, 
+      createdAt,
+      notes: insertExample.notes ?? null,
+    };
+    this.trainingExamples.set(id, example);
+    return example;
+  }
+
+  async deleteTrainingExample(id: string): Promise<void> {
+    this.trainingExamples.delete(id);
   }
 }
 
@@ -204,6 +235,28 @@ export class DbStorage implements IStorage {
 
   async deleteFeedback(id: string): Promise<void> {
     await db.delete(feedback).where(eq(feedback.id, id));
+  }
+
+  // Training example methods
+  async getAllTrainingExamples(): Promise<TrainingExample[]> {
+    return await db.select().from(trainingExamples).orderBy(desc(trainingExamples.createdAt));
+  }
+
+  async createTrainingExample(insertExample: InsertTrainingExample): Promise<TrainingExample> {
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const example: TrainingExample = { 
+      ...insertExample, 
+      id, 
+      createdAt,
+      notes: insertExample.notes ?? null,
+    };
+    await db.insert(trainingExamples).values(example);
+    return example;
+  }
+
+  async deleteTrainingExample(id: string): Promise<void> {
+    await db.delete(trainingExamples).where(eq(trainingExamples.id, id));
   }
 }
 
