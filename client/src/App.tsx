@@ -8,6 +8,7 @@ import Home from "@/pages/home";
 import CreatePeula from "@/pages/create-peula";
 import PeulaView from "@/pages/peula-view";
 import Library from "@/pages/library";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/create" component={CreatePeula} />
       <Route path="/peula/:id" component={PeulaView} />
       <Route path="/library" component={Library} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

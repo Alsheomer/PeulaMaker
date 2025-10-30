@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Home } from "lucide-react";
+import { FileText, Plus, Home, Settings } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -38,6 +38,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               >
                 <FileText className="w-4 h-4 mr-2" />
                 My Peulot
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button
+                variant={location === "/settings" ? "secondary" : "ghost"}
+                size="sm"
+                data-testid="nav-settings"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
               </Button>
             </Link>
             <Link href="/create">
