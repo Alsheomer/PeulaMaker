@@ -1,0 +1,161 @@
+Love this direction. Here’s a tight, plug-and-play plan to (1) add per-section feedback that actually teaches the model, and (2) make the peula creation form smarter with dynamic validation + clear guidance.
+
+1) Data model (minimal + future-proof)
+
+Tables/collections
+	•	peulot: id, title, age, duration, groupSize, setting, energy, contentPath, guidingQuestion, createdAt.
+	•	sections: id, peulaId, order, sugZman, name, content, minutes, gearNotes, methodKey, safetyFlag, createdAt.
+	•	feedback: id, peulaId, sectionId, authorId, createdAt,
+rating_overall (1–5), rating_clarity (1–5), rating_safety (1–5), rating_inclusion (1–5),
+glow (text), grow (text), tags (array: [“too long”,“missing safety”,“great debrief”,“low energy”]),
+suggested_fix (text).
+	•	method_stats: methodKey, topicKey, countUsed, avgMinutes, score (float), lastUpdated.
+	•	rules_overrides (optional): user/team-level tweaks, e.g., reflectionMinPct=0.25.
+
+2) Feedback UX (per section, fast + structured)
+
+Under each section row:
+	•	Quick score strip: Overall ★1–★5 + toggles (clarity/safety/inclusion).
+	•	Glows/Grows: two short text boxes (“What worked?”, “What to change?”).
+	•	Tag chips: one-click tags (Too long, Missing gear, Needs movement, Weak debrief, etc.).
+	•	Suggested fix: one box for ready-to-paste micro rewrite.
+	•	View last 5: collapsible list of recent comments for this section.
+	•	Regenerate this section: button uses feedback to rewrite only this block.
+
+Tips in UI:
+	•	Show tiny rubric hint: “Good section = ≤120 words, clear roles, safety note (if physical), 1–2 debrief Qs.”
+
+3) Dynamic validation on the Peula creation form
+
+Validate live as the user types; show inline messages and a sticky checklist at the top.
+
+Hard rules (block generation must pass)
+	•	Reflection time ≥ 20% of total.
+	•	Movement cadence: at least one movement block starts every ≤12 minutes.
+	•	Shigra + Maslul present in the final 10 minutes.
+	•	If safetyFlag=true or content mentions חבל/ריצה/מסלול/כדורים → section must include a short safety line in “ציוד והערות”.
+	•	Every section has minutes (number) and crisp name (≤40 chars).
+
+Soft rules (warn, don’t block)
+	•	Each section ≤120 words.
+	•	At least one debrief prompt after any game/challenge.
+	•	Everyone has a role every round (Leader/Timekeeper/Safety/Observer/Materials/Morale).
+
+Example schema (JS with Zod/Yup-style pseudo)
+
+peula: {
+  age: z.enum(['13-14','15-17']),
+  duration: z.number().min(30).max(120),
+  sections: z.array(section).min(4)
+}
+section: {
+  sugZman: z.string().min(2),
+  name: z.string().max(40),
+  content: z.string().max(900),
+  minutes: z.number().min(3).max(30),
+  gearNotes: z.string().optional(),
+  safetyFlag: z.boolean().default(false)
+}
+
+Derived validators
+	•	minutesSum == duration (or within ±2 and auto-offers to fix).
+	•	reflectionPct = minutes(reflection)/duration >= 0.2.
+	•	movementWindowsOK(sections) → returns the start times that violate the ≤12 rule.
+	•	needsSafety(section) ⇒ safetyFlag || patternMatch(content) and hasSafetyNote(gearNotes).
+
+Show fixes inline:
+	•	“Reflection is 14% (<20%). Add 6 minutes to Reflection or move 6 minutes from Main A?”
+	•	“No active block between 00:18–00:33. Insert 90-ש׳ ‘מתחמם זריז’?”
+
+4) Learning loop (how feedback teaches the model)
+
+A. Ingest
+	•	On save, write each feedback row.
+	•	Update method_stats:
+	•	score = EMA(score, newNormalizedRating, α=0.3)
+	•	Increment countUsed, keep rolling avgMinutes.
+
+B. Retrieve for generation
+For a new peula:
+	•	Build topic profile = last 60 days feedback where topic≈current contentPath OR age≈current age.
+	•	For each candidate method block, compute methodScore = base + method_stats.score + tagBoosts - penaltyFromTags.
+	•	tagBoosts: e.g., if many “great debrief” on Coaching stations, boost that template.
+	•	penalties: if method has “too long” or “missing safety” tags > threshold, down-rank or enforce stricter limits.
+	•	Select top-ranked blocks that satisfy rules (reflection %, movement).
+
+C. Prompt conditioning
+Pass to the model a compact “What to emulate / avoid” distilled from feedback:
+	•	Do more: 3–5 bullets from high-scoring comments for similar age/topic.
+	•	Avoid: 3–5 bullets from tags with low ratings.
+	•	Concrete fixes: one-liners from suggested_fix (last 5).
+
+Example injected context:
+	•	“Prefer concise instructions (≤100 words), explicit roles each round, and 2 debrief Qs after games.”
+	•	“Avoid overlong station intros; print rules on cards instead.”
+	•	“Always add 60-ש׳ Safety Hunt before rope tasks.”
+
+D. Section-level regenerate
+When “Regenerate this section” is clicked:
+	•	Retrieve only feedback linked to this sectionId + methodKey.
+	•	Feed the model with the three most recent glows/grows + tags and the rubric misses for that section.
+	•	Require it to keep the same minutes unless user allows change.
+
+5) Prompts (short, deterministic)
+
+System (fixed)
+	•	“Write only a Hebrew table: סוג הזמן | שם | הסבר/תוכן | זמן | ציוד והערות. Imperative, concise. Movement ≤12 rule, Reflection ≥20%, Shגra + Maslul at end, Safety line before physical. ≤120 words per section.”
+
+Context (dynamic from learning loop)
+	•	DoMore[], Avoid[], Fixes[] (bullets)
+	•	method_stats top 6 methodKeys with notes (e.g., “Stations (5×5), Coaching ball—keep tips short; Observers: +/→next”)
+
+User variables
+	•	Age, Duration, GroupSize, Setting, Energy, Topic, GuidingQuestion, MustInclude/MustAvoid, CalendarHook.
+
+6) Clearer guidance in the creation form (what the user sees)
+	•	Section helpers (hover or side panel):
+	•	“Name: ≤40 chars, action-oriented (e.g., ‘מחסן רמזים’).”
+	•	“Content: 2–4 sentences max. Include: split into teams, rules, debrief questions.”
+	•	“Gear: list only, plus 1-line safety if physical.”
+	•	Top checklist updates live:
+	•	Reflection ≥20% ✔/✖
+	•	Movement cadence ✔/✖
+	•	Safety present ✔/✖
+	•	Roles per round ✔/✖
+	•	Shigra + Maslul ✔/✖
+	•	One-click fixes:
+	•	“Add Shigra (3’) + Maslul (2’) to the end.”
+	•	“Insert ‘Safety Hunt 60-ש׳’ before rope challenge.”
+	•	“Shorten this section to 100 words.”
+
+7) Minimal algorithms (pseudo) you can drop in
+
+function pickBlocks(candidates, topicProfile) {
+  return candidates
+    .map(m => ({ 
+      m,
+      score: m.base + getMethodStat(m).score + tagBoosts(m, topicProfile) - tagPenalties(m, topicProfile)
+    }))
+    .sort((a,b)=>b.score-a.score)
+    .filter(passRules)
+    .slice(0, desiredCount);
+}
+
+function learnFromFeedback(fb) {
+  const s = getMethodStat(fb.methodKey, fb.topicKey);
+  const r = normalize(fb.rating_overall, fb.tags);
+  s.score = 0.7*s.score + 0.3*r; // EMA
+  s.avgMinutes = (s.avgMinutes*(s.countUsed) + fb.minutes)/ (s.countUsed+1);
+  s.countUsed++;
+  save(s);
+}
+
+8) What to build next (small tickets)
+	•	Add tag vocabulary and map to actions (e.g., “missing safety” ⇒ force SafetyStep).
+	•	Add A/B review: when regenerating a section, show Diff and “Keep A / Keep B”.
+	•	Export Feedback Digest per month (top glows, common grows, best blocks).
+	•	Add team presets (e.g., Irvine Tzofim: Reflection min 25%, no sprinting at JCC).
+
+—
+
+If you want, I can convert this into a JSON spec (DB schema + API endpoints + prompt payloads) tailored to your stack, or draft the exact validator functions for your current form.

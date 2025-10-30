@@ -1,0 +1,143 @@
+Awesome question. Here’s a compact, battle-tested blueprint to make your Peula-Maker “learn” from feedback and get measurably better, fast. It’s practical (you can implement each block now) and efficient (low-compute, online updates, no model retraining required).
+
+1) Capture the right signals (structured + cheap)
+
+For every section you generate, store:
+	•	rating_overall (1–5), clarity/safety/inclusion (1–5)
+	•	tags[] (checkboxes): too_long, missing_safety, weak_debrief, low_energy, unclear_roles, great_flow, scout_identity+
+	•	suggested_fix (short text), minutes, methodKey, topicKey, ageBand
+	•	implicit signals you can compute later: was the section edited before running (Y/N), time overrun (Y/N), was “regenerate section” used (Y/N)
+
+This structure lets you learn without long free-text parsing and keeps costs down.
+
+2) Normalize feedback into a single reward
+
+Convert each feedback row to reward ∈ [0,1]:
+
+base = (rating_overall - 1) / 4                      // 1★→0, 5★→1
+pen  = 0.1*has('too_long') + 0.2*has('missing_safety') + 0.1*has('weak_debrief')
+boost= 0.05*has('great_flow') + 0.05*has('scout_identity+')
+
+reward = clamp(base + boost - pen, 0, 1)
+
+Keep it simple and transparent. Tags have direct operational meaning (see §5).
+
+3) Learn online with tiny, stable updates
+
+Maintain method_stats per (methodKey, topicKey, ageBand):
+
+n += 1
+ema_score = (1-α)*ema_score + α*reward         // α=0.3 works well
+ema_minutes = (1-β)*ema_minutes + β*minutes    // β=0.1 smooths duration
+last_feedback_at = now()
+
+This gives you instant learning without retraining the LLM.
+
+4) Pick better building blocks with bandits (efficient exploration)
+
+When choosing blocks (stations/game/debrief) for a new peula, use Thompson Sampling so you keep exploring but bias toward winners.
+
+For each candidate (methodKey, topicKey, ageBand) keep Beta params:
+
+success = round(reward)         // or reward>0.7
+fail    = 1 - success
+α_m ← α_m + success
+β_m ← β_m + fail
+score_m = sample Beta(α_m, β_m) + λ * ema_score   // λ small, e.g., 0.2
+
+Pick the top K by score_m subject to hard constraints (reflection %, movement cadence, safety). Thompson gives you strong performance with tiny compute.
+
+5) Let tags drive concrete fixes (no magic, just rules)
+
+Create a tag→action map that modifies prompts/post-processing:
+	•	missing_safety ⇒ always prepend a “Safety Hunt 60ש׳” line before physical blocks; forbid generation that lacks “כללי בטיחות” in ציוד.
+	•	too_long ⇒ reduce per-section word cap from 120→90 and require rule cards (“print rules, 2 lines max”).
+	•	weak_debrief ⇒ enforce 2 questions after every game/challenge.
+	•	low_energy ⇒ insert a 90-ש׳ energizer if any 12-min window has no movement.
+	•	unclear_roles ⇒ force “Roles: Leader/Time/Safety/Observer/Materials/Morale” line in content.
+
+These deterministic patches make learning immediate and reliable.
+
+6) Condition the LLM with a tiny “learning context”
+
+Before each generation, build a small context blob (no heavy RAG):
+	•	Do more (3 bullets): highest-reward glows for this topic/age in last 60 days.
+	•	Avoid (3 bullets): most frequent negative tags.
+	•	Local stats: “Coaching station avg success 0.78; keep intros <40 words; add 2 debrief Qs.”
+	•	Fixed guardrails: movement≤12, reflection≥20, Shigra+Maslul, safety line.
+
+Feed this to the system/user prompt; no examples, just constraints and tendencies.
+
+7) Post-processor = quality gate (fast, deterministic)
+
+After the model returns the table:
+	1.	Retiming to hit duration (never cut Reflection).
+	2.	Safety injector for physical words (חבל/מסלול/כדורים/ריצה) if no safety note present.
+	3.	Movement scan; insert 90-ש׳ energizer if a gap >12 minutes.
+	4.	Shigra + Maslul append if missing.
+	5.	Lint: trim content to ≤120 (or ≤90 if too_long penalty active), ensure gear list is concise.
+
+This turns messy outputs into consistent, runnable plans without another model call.
+
+8) Efficient personalization without fragmentation
+
+Give every shevet/team a profile vector:
+
+profile = {
+  reflection_min_pct: 0.20…0.30,
+  no_running: true/false,
+  preferred_methods: ['stations','roleplay'],
+  language: 'HE'|'EN'|'mixed'
+}
+
+At generation, apply the profile as rule overrides and as priors in the bandit (small α bonus for preferred methods). This scales learning per troop without cloning the whole system.
+
+9) Guard against noisy feedback (robustness)
+	•	Weight newer feedback slightly more: w = 1 / sqrt(1 + age_days/14)
+	•	Use Wilson lower bound for display ranking:
+wilson = (p + z²/(2n) - z*sqrt((p(1-p)+z²/(4n))/n))/(1+z²/n) with p=avg_success, z=1.96
+	•	Ignore outliers: drop top/bottom 1% section lengths and minutes when computing averages.
+	•	Require minimum n (e.g., 5 feedbacks) before a method is allowed to dominate selections.
+
+10) Cheap, meaningful evaluation (prove it’s working)
+
+Track these metrics weekly:
+	•	Edit rate: % of sections users edit before running (should go down).
+	•	Regen rate: % sections that needed regeneration (down is good).
+	•	Safety violations caught by validator (should approach zero).
+	•	Reflection coverage: median % time in reflection (>=20%).
+	•	Thumb-pulse (end of peula): “I led at least once” (target ≥80%), “Process was clear” (≥80%).
+
+Plot simple lines; if a metric stalls, escalate exploration (raise Thompson ε by widening Beta sampling).
+
+11) Implementation skeleton (tiny + fast)
+	•	Storage: the tables you already have (peulot, sections, feedback, method_stats).
+	•	Update loop (server):
+	•	on feedback save → update_method_stats() (EMA + Beta)
+	•	Generation:
+	•	candidates = filterByRules(methodLibrary, inputs)
+	•	ranked = thompsonRank(candidates, topicKey, ageBand)
+	•	draft = callLLM(inputs, learningContext(ranked, stats, tags))
+	•	final = postProcess(draft, rules, tagActions)
+	•	Section regenerate:
+	•	pull last N feedback for this methodKey/sectionId, rebuild a section-only learningContext, call LLM with same minutes.
+
+12) Costs and speed
+	•	No model training. All learning is in metadata (EMA, Beta), prompt conditioning, and deterministic post-processing.
+	•	One LLM call per peula (two only if validation fails hard).
+	•	Micro caching: if inputs identical within 24h and no new feedback, reuse last output.
+
+13) Safety + identity never regress
+
+Hard-lock these in code, not just prompt:
+	•	Reflection ≥ 20%
+	•	Movement cadence ≤12 min
+	•	Safety line before physical
+	•	Shigra + Maslul rows at the end
+	•	Tzofiyut tie at least once (knots/patrol/small-group challenge)
+
+If the model omits them, the post-processor inserts them—zero debate.
+
+⸻
+
+If you want, I can turn this into concrete functions for your stack (e.g., update_method_stats(), thompsonRank(), postProcess()), plus the exact JSON the model should receive for the learningContext so you can plug it in immediately.
