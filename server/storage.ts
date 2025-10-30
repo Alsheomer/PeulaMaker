@@ -1,5 +1,7 @@
-import { type User, type InsertUser, type Peula, type InsertPeula } from "@shared/schema";
+import { type User, type InsertUser, type Peula, type InsertPeula, users, peulot } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { eq, desc } from "drizzle-orm";
+import { db } from "./db";
 
 // Storage interface for both users and peulot
 export interface IStorage {
@@ -66,4 +68,47 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database-backed storage implementation
+export class DbStorage implements IStorage {
+  // User methods
+  async getUser(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = { ...insertUser, id };
+    await db.insert(users).values(user);
+    return user;
+  }
+
+  // Peula methods
+  async getPeula(id: string): Promise<Peula | undefined> {
+    const result = await db.select().from(peulot).where(eq(peulot.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllPeulot(): Promise<Peula[]> {
+    return await db.select().from(peulot).orderBy(desc(peulot.createdAt));
+  }
+
+  async createPeula(insertPeula: InsertPeula): Promise<Peula> {
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const peula: Peula = { ...insertPeula, id, createdAt };
+    await db.insert(peulot).values(peula);
+    return peula;
+  }
+
+  async deletePeula(id: string): Promise<void> {
+    await db.delete(peulot).where(eq(peulot.id, id));
+  }
+}
+
+export const storage = new DbStorage();
