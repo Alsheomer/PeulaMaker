@@ -191,20 +191,21 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
     
     const requests: any[] = [];
     
-    // Add rows if needed
+    // Add rows if needed (must add one at a time)
     if (rowsToAdd > 0) {
       console.log(`Adding ${rowsToAdd} rows to table`);
-      requests.push({
-        insertTableRow: {
-          tableCellLocation: {
-            tableStartLocation: { index: tableStartIndex },
-            rowIndex: existingRows - 1,
-            columnIndex: 0
-          },
-          insertBelow: true,
-          number: rowsToAdd
-        }
-      });
+      for (let i = 0; i < rowsToAdd; i++) {
+        requests.push({
+          insertTableRow: {
+            tableCellLocation: {
+              tableStartLocation: { index: tableStartIndex },
+              rowIndex: existingRows - 1 + i,
+              columnIndex: 0
+            },
+            insertBelow: true
+          }
+        });
+      }
       
       await docs.documents.batchUpdate({
         documentId,
