@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, FileText, Download, Trash2, Eye, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, FileText, Download, Trash2, Eye, Loader2, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { Peula } from "@shared/schema";
 import { useState } from "react";
@@ -22,6 +23,8 @@ import {
 
 export default function Library() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [ageFilter, setAgeFilter] = useState<string>("all");
+  const [durationFilter, setDurationFilter] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -76,12 +79,25 @@ export default function Library() {
 
   const filteredPeulot = peulot.filter((peula) => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = searchQuery === "" || (
       peula.title.toLowerCase().includes(query) ||
       peula.topic.toLowerCase().includes(query) ||
       peula.ageGroup.toLowerCase().includes(query)
     );
+    
+    const matchesAge = ageFilter === "all" || peula.ageGroup === ageFilter;
+    const matchesDuration = durationFilter === "all" || peula.duration === durationFilter;
+    
+    return matchesSearch && matchesAge && matchesDuration;
   });
+
+  const hasActiveFilters = ageFilter !== "all" || durationFilter !== "all";
+  
+  const clearAllFilters = () => {
+    setAgeFilter("all");
+    setDurationFilter("all");
+    setSearchQuery("");
+  };
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -102,8 +118,8 @@ export default function Library() {
           </Link>
         </div>
 
-        {/* Search */}
-        <div className="mb-6">
+        {/* Search and Filters */}
+        <div className="mb-6 space-y-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -114,6 +130,64 @@ export default function Library() {
               className="pl-10"
               data-testid="input-search"
             />
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <Select value={ageFilter} onValueChange={setAgeFilter}>
+                <SelectTrigger className="w-40" data-testid="select-age-filter">
+                  <SelectValue placeholder="Age Group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ages</SelectItem>
+                  <SelectItem value="6-8">6-8 years</SelectItem>
+                  <SelectItem value="9-11">9-11 years</SelectItem>
+                  <SelectItem value="12-14">12-14 years</SelectItem>
+                  <SelectItem value="15-17">15-17 years</SelectItem>
+                  <SelectItem value="18+">18+ years</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={durationFilter} onValueChange={setDurationFilter}>
+                <SelectTrigger className="w-40" data-testid="select-duration-filter">
+                  <SelectValue placeholder="Duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Durations</SelectItem>
+                  <SelectItem value="30-45">30-45 min</SelectItem>
+                  <SelectItem value="45-60">45-60 min</SelectItem>
+                  <SelectItem value="60-90">60-90 min</SelectItem>
+                  <SelectItem value="90+">90+ min</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAllFilters}
+                data-testid="button-clear-filters"
+              >
+                <X className="w-3 h-3 mr-1" />
+                Clear Filters
+              </Button>
+            )}
+
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2">
+                {ageFilter !== "all" && (
+                  <Badge variant="secondary" className="text-xs">
+                    Age: {ageFilter}
+                  </Badge>
+                )}
+                {durationFilter !== "all" && (
+                  <Badge variant="secondary" className="text-xs">
+                    Duration: {durationFilter}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
