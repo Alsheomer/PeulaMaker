@@ -98,7 +98,11 @@ export default function Settings() {
     },
   });
 
-  const { data: driveFiles = [], isLoading: driveFilesLoading } = useQuery<DriveFile[]>({
+  const { 
+    data: driveFiles = [], 
+    isLoading: driveFilesLoading,
+    error: driveFilesError 
+  } = useQuery<DriveFile[]>({
     queryKey: ["/api/google-drive/docs"],
     enabled: driveDialogOpen,
   });
@@ -107,14 +111,15 @@ export default function Settings() {
     mutationFn: async (data: { documentId: string; notes?: string }) => {
       return await apiRequest("POST", "/api/training-examples/import-from-drive", data);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/training-examples"] });
+      const documentName = data.title || "Document";
       setDriveDialogOpen(false);
       setSelectedDriveFile(null);
       setDriveImportNotes("");
       toast({
         title: "Import Successful",
-        description: "Training example imported from Google Drive",
+        description: `"${documentName}" imported from Google Drive`,
       });
     },
     onError: (error: Error) => {
@@ -214,6 +219,21 @@ export default function Settings() {
                 {driveFilesLoading ? (
                   <div className="flex items-center justify-center py-12 text-muted-foreground">
                     Loading your Google Docs...
+                  </div>
+                ) : driveFilesError ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <p className="text-destructive font-medium mb-2">Failed to load Google Docs</p>
+                    <p className="text-sm text-muted-foreground">
+                      {driveFilesError instanceof Error ? driveFilesError.message : "Unable to connect to Google Drive"}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-4"
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/google-drive/docs"] })}
+                    >
+                      Try Again
+                    </Button>
                   </div>
                 ) : driveFiles.length === 0 ? (
                   <div className="flex items-center justify-center py-12 text-muted-foreground">
