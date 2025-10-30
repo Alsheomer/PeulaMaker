@@ -339,3 +339,55 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
     throw new Error("Failed to export peula to Google Docs");
   }
 }
+
+export async function importGoogleDocsContent(documentId: string): Promise<{ title: string; content: string }> {
+  try {
+    const docs = await getUncachableGoogleDocsClient();
+    
+    const doc = await docs.documents.get({
+      documentId: documentId
+    });
+
+    if (!doc.data || !doc.data.body) {
+      throw new Error("Unable to read document content");
+    }
+
+    const title = doc.data.title || "Untitled Document";
+    
+    let content = "";
+    const body = doc.data.body;
+    
+    if (body.content) {
+      for (const element of body.content) {
+        if (element.paragraph && element.paragraph.elements) {
+          for (const textElement of element.paragraph.elements) {
+            if (textElement.textRun && textElement.textRun.content) {
+              content += textElement.textRun.content;
+            }
+          }
+        } else if (element.table) {
+          for (const row of element.table.tableRows || []) {
+            for (const cell of row.tableCells || []) {
+              if (cell.content) {
+                for (const cellElement of cell.content) {
+                  if (cellElement.paragraph && cellElement.paragraph.elements) {
+                    for (const textElement of cellElement.paragraph.elements) {
+                      if (textElement.textRun && textElement.textRun.content) {
+                        content += textElement.textRun.content;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { title, content: content.trim() };
+  } catch (error) {
+    console.error("Error importing from Google Docs:", error);
+    throw new Error("Failed to import document. Make sure the document is shared and accessible.");
+  }
+}
