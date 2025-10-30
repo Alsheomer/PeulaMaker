@@ -52,19 +52,109 @@ async function getUncachableGoogleDocsClient() {
   return google.docs({ version: 'v1', auth: oauth2Client });
 }
 
+async function getUncachableGoogleDriveClient() {
+  const accessToken = await getAccessToken();
+
+  const oauth2Client = new google.auth.OAuth2();
+  oauth2Client.setCredentials({
+    access_token: accessToken
+  });
+
+  return google.drive({ version: 'v3', auth: oauth2Client });
+}
+
+async function findTemplateDocument(): Promise<string | null> {
+  try {
+    const drive = await getUncachableGoogleDriveClient();
+    
+    const response = await drive.files.list({
+      q: "name contains 'copy of peula format' and mimeType = 'application/vnd.google-apps.document'",
+      spaces: 'drive',
+      fields: 'files(id, name)',
+      pageSize: 10
+    });
+
+    const files = response.data.files;
+    if (files && files.length > 0) {
+      console.log(`Found template: ${files[0].name} (${files[0].id})`);
+      return files[0].id || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error searching for template:", error);
+    return null;
+  }
+}
+
+async function readTemplateStructure(documentId: string): Promise<any> {
+  try {
+    const docs = await getUncachableGoogleDocsClient();
+    
+    const response = await docs.documents.get({
+      documentId: documentId
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error("Error reading template:", error);
+    return null;
+  }
+}
+
 export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
   try {
     const docs = await getUncachableGoogleDocsClient();
+    const drive = await getUncachableGoogleDriveClient();
     const content = peula.content as PeulaContent;
 
-    // Create a new document
-    const createResponse = await docs.documents.create({
-      requestBody: {
-        title: peula.title
-      }
-    });
+    // Try to find the template document
+    const templateId = await findTemplateDocument();
+    
+    let documentId: string;
+    
+    if (templateId) {
+      // Copy the template
+      console.log("Using template document");
+      const copyResponse = await drive.files.copy({
+        fileId: templateId,
+        requestBody: {
+          name: peula.title
+        }
+      });
+      
+      documentId = copyResponse.data.id!;
+      
+      // Read the template structure to understand placeholders
+      const templateData = await readTemplateStructure(documentId);
+      
+      // We'll replace content in the copied template
+      // For now, let's clear it and add our content with the same formatting style
+      const clearRequests: any[] = [{
+        deleteContentRange: {
+          range: {
+            startIndex: 1,
+            endIndex: (templateData?.body?.content?.[templateData.body.content.length - 1]?.endIndex || 2) - 1
+          }
+        }
+      }];
+      
+      await docs.documents.batchUpdate({
+        documentId,
+        requestBody: { requests: clearRequests }
+      });
+    } else {
+      // No template found, create a new document
+      console.log("Template not found, creating new document");
+      const createResponse = await docs.documents.create({
+        requestBody: {
+          title: peula.title
+        }
+      });
 
-    const documentId = createResponse.data.documentId;
+      documentId = createResponse.data.documentId!;
+    }
+    
     if (!documentId) {
       throw new Error("Failed to create document");
     }
