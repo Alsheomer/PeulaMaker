@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generatePeula, regenerateSection } from "./ai";
 import { exportPeulaToGoogleDocs } from "./google-docs";
-import { questionnaireResponseSchema } from "@shared/schema";
+import { questionnaireResponseSchema, insertFeedbackSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all peulot
@@ -140,6 +140,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting peula:", error);
       res.status(500).json({ error: "Failed to delete peula" });
+    }
+  });
+
+  // Get feedback for a specific peula
+  app.get("/api/peulot/:id/feedback", async (req, res) => {
+    try {
+      const feedbackList = await storage.getFeedbackForPeula(req.params.id);
+      res.json(feedbackList);
+    } catch (error) {
+      console.error("Error fetching feedback:", error);
+      res.status(500).json({ error: "Failed to fetch feedback" });
+    }
+  });
+
+  // Create feedback for a peula section
+  app.post("/api/feedback", async (req, res) => {
+    try {
+      const validation = insertFeedbackSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Invalid feedback data",
+          details: validation.error.errors 
+        });
+      }
+
+      const newFeedback = await storage.createFeedback(validation.data);
+      res.json(newFeedback);
+    } catch (error) {
+      console.error("Error creating feedback:", error);
+      res.status(500).json({ error: "Failed to create feedback" });
+    }
+  });
+
+  // Delete feedback
+  app.delete("/api/feedback/:id", async (req, res) => {
+    try {
+      await storage.deleteFeedback(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting feedback:", error);
+      res.status(500).json({ error: "Failed to delete feedback" });
     }
   });
 

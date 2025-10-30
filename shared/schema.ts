@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -19,6 +19,15 @@ export const peulot = pgTable("peulot", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+// Feedback on peula sections for AI learning
+export const feedback = pgTable("feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  peulaId: varchar("peula_id").notNull().references(() => peulot.id, { onDelete: 'cascade' }),
+  componentIndex: integer("component_index").notNull(), // 0-8 for the 9 components
+  comment: text("comment").notNull(),
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
 export const insertPeulaSchema = createInsertSchema(peulot).omit({
   id: true,
   createdAt: true,
@@ -26,6 +35,14 @@ export const insertPeulaSchema = createInsertSchema(peulot).omit({
 
 export type InsertPeula = z.infer<typeof insertPeulaSchema>;
 export type Peula = typeof peulot.$inferSelect;
+
+export const insertFeedbackSchema = createInsertSchema(feedback).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type Feedback = typeof feedback.$inferSelect;
 
 // Questionnaire response schema (for frontend state)
 export const questionnaireResponseSchema = z.object({

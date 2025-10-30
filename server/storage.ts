@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Peula, type InsertPeula, users, peulot } from "@shared/schema";
+import { type User, type InsertUser, type Peula, type InsertPeula, type Feedback, type InsertFeedback, users, peulot, feedback } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { eq, desc } from "drizzle-orm";
 import { db } from "./db";
@@ -16,15 +16,23 @@ export interface IStorage {
   createPeula(peula: InsertPeula): Promise<Peula>;
   updatePeula(id: string, updates: Partial<InsertPeula>): Promise<Peula | undefined>;
   deletePeula(id: string): Promise<void>;
+  
+  // Feedback methods
+  getFeedbackForPeula(peulaId: string): Promise<Feedback[]>;
+  getAllFeedback(): Promise<Feedback[]>;
+  createFeedback(feedbackData: InsertFeedback): Promise<Feedback>;
+  deleteFeedback(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private peulot: Map<string, Peula>;
+  private feedback: Map<string, Feedback>;
 
   constructor() {
     this.users = new Map();
     this.peulot = new Map();
+    this.feedback = new Map();
   }
 
   // User methods
@@ -86,6 +94,27 @@ export class MemStorage implements IStorage {
 
   async deletePeula(id: string): Promise<void> {
     this.peulot.delete(id);
+  }
+
+  // Feedback methods
+  async getFeedbackForPeula(peulaId: string): Promise<Feedback[]> {
+    return Array.from(this.feedback.values()).filter(fb => fb.peulaId === peulaId);
+  }
+
+  async getAllFeedback(): Promise<Feedback[]> {
+    return Array.from(this.feedback.values());
+  }
+
+  async createFeedback(insertFeedback: InsertFeedback): Promise<Feedback> {
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const newFeedback: Feedback = { ...insertFeedback, id, createdAt };
+    this.feedback.set(id, newFeedback);
+    return newFeedback;
+  }
+
+  async deleteFeedback(id: string): Promise<void> {
+    this.feedback.delete(id);
   }
 }
 
@@ -154,6 +183,27 @@ export class DbStorage implements IStorage {
 
   async deletePeula(id: string): Promise<void> {
     await db.delete(peulot).where(eq(peulot.id, id));
+  }
+
+  // Feedback methods
+  async getFeedbackForPeula(peulaId: string): Promise<Feedback[]> {
+    return await db.select().from(feedback).where(eq(feedback.peulaId, peulaId)).orderBy(desc(feedback.createdAt));
+  }
+
+  async getAllFeedback(): Promise<Feedback[]> {
+    return await db.select().from(feedback).orderBy(desc(feedback.createdAt));
+  }
+
+  async createFeedback(insertFeedback: InsertFeedback): Promise<Feedback> {
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const newFeedback: Feedback = { ...insertFeedback, id, createdAt };
+    await db.insert(feedback).values(newFeedback);
+    return newFeedback;
+  }
+
+  async deleteFeedback(id: string): Promise<void> {
+    await db.delete(feedback).where(eq(feedback.id, id));
   }
 }
 
