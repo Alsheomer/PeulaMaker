@@ -9,55 +9,92 @@ const openai = new OpenAI({
 });
 
 export async function generatePeula(responses: QuestionnaireResponse): Promise<{ title: string; content: PeulaContent }> {
-  const prompt = `You are an expert Tzofim (Israeli Scouts) activity planner with deep knowledge of scout methodology and best practices. Based on the following questionnaire responses, create a comprehensive peula (activity plan) following the 9-component framework.
+  const prompt = `You are an expert Tzofim (Israeli Scouts) educational facilitator creating a detailed peula (activity plan).
 
-Questionnaire Responses:
-- Topic/Theme: ${responses.topic}
-- Age Group: ${responses.ageGroup} years old
-- Duration: ${responses.duration} minutes
-- Group Size: ${responses.groupSize} chanichim
-- Educational Goals: ${responses.goals}
-${responses.availableMaterials && responses.availableMaterials.length > 0 ? `- Available Materials: ${responses.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
-${responses.specialConsiderations ? `- Special Considerations: ${responses.specialConsiderations}` : ''}
+Input Information:
+Topic: ${responses.topic}
+Age: ${responses.ageGroup} years
+Duration: ${responses.duration} minutes
+Group Size: ${responses.groupSize}
+Goals: ${responses.goals}
+${responses.availableMaterials && responses.availableMaterials.length > 0 ? `Available Materials: ${responses.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
+${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}
 
-Create a detailed peula plan with the following 9 components. For each component, provide:
-1. Description & Guidelines - Detailed, specific instructions for this peula
-2. Tzofim Best Practices & Tips - Scout-specific insights and methodology
-3. Time Structure - Specific time allocations and suggestions
+Create a professional, actionable peula with these 9 components. Be specific, practical, and aligned with Tzofim educational values.
 
-The 9 components are:
-1. Topic & Educational Goal
-2. Know Your Audience
-3. Choose Methods & Activities
-4. Structure the Peula (Flow)
-5. Time Management
-6. Materials & Logistics
-7. Risk & Safety
-8. Delivery & Facilitation
-9. Reflection & Debrief
+For each component provide:
+- Description: Clear, actionable content
+- Best Practices: Tzofim methodology and tips
+- Time Structure: Specific time breakdown
 
-IMPORTANT GUIDELINES:
-- Be specific and actionable, not generic
-- Include concrete activity suggestions that fit the topic, age, and goals
-- Reference the exact age group, duration, and group size provided
-- If materials were mentioned, incorporate them creatively
-- Follow Tzofim principles: experiential learning, self-discovery, personal example
-- Use Hebrew/Israeli scout terminology appropriately (madrich, chanichim, shevet, ken yachad, etc.)
-- Ensure time allocations match the total duration provided
-- Address any special considerations mentioned
-- Make it engaging, educational, and aligned with scout values
+Guidelines:
+• Write naturally and professionally
+• Provide specific activities, not general advice
+• Include exact timing that adds up to the total duration
+• Use concrete examples and instructions
+• Integrate specified materials creatively
+• Apply Tzofim principles: experiential learning, active participation, reflection
+• Keep language clear and implementation-focused
+• Address safety, logistics, and facilitation practically
 
-Return your response as a JSON object with this structure:
+Return valid JSON:
 {
-  "title": "A clear, descriptive title for this peula (e.g., 'Leadership Through Team Challenges - Ages 12-14')",
+  "title": "Descriptive peula title",
   "components": [
     {
       "component": "1. Topic & Educational Goal",
-      "description": "Detailed description and guidelines specific to this peula...",
-      "bestPractices": "Tzofim-specific best practices and tips...",
-      "timeStructure": "Specific time allocations and suggestions..."
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
     },
-    // ... repeat for all 9 components
+    {
+      "component": "2. Know Your Audience",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "3. Choose Methods & Activities",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "4. Structure the Peula (Flow)",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "5. Time Management",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "6. Materials & Logistics",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "7. Risk & Safety",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "8. Delivery & Facilitation",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    },
+    {
+      "component": "9. Reflection & Debrief",
+      "description": "...",
+      "bestPractices": "...",
+      "timeStructure": "..."
+    }
   ]
 }`;
 
