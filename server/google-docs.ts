@@ -69,10 +69,8 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
       throw new Error("Failed to create document");
     }
 
-    // Prepare the content for the document
+    // Build the content as formatted text sections with clear headers
     const requests: any[] = [];
-    
-    // Add title and metadata
     let currentIndex = 1;
     
     // Title
@@ -82,6 +80,7 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
         text: `${peula.title}\n\n`
       }
     });
+    const titleEndIndex = currentIndex + peula.title.length;
     currentIndex += peula.title.length + 2;
 
     // Metadata
@@ -95,75 +94,76 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
     currentIndex += metadata.length;
 
     // Educational Goals
+    const goalsText = `Educational Goals:\n${peula.goals}\n\n`;
+    const goalsStartIndex = currentIndex;
     requests.push({
       insertText: {
         location: { index: currentIndex },
-        text: `Educational Goals:\n${peula.goals}\n\n`
+        text: goalsText
       }
     });
-    currentIndex += 18 + peula.goals.length + 2;
+    currentIndex += goalsText.length;
 
-    // Table header
+    // Section Header
+    const sectionHeader = `Peula Components\n\n`;
+    const sectionHeaderStartIndex = currentIndex;
     requests.push({
       insertText: {
         location: { index: currentIndex },
-        text: `Peula Components:\n\n`
+        text: sectionHeader
       }
     });
-    currentIndex += 19;
+    currentIndex += sectionHeader.length;
 
-    // Create table structure - 3 columns
-    const tableRows = content.components.length + 1; // +1 for header row
-    requests.push({
-      insertTable: {
-        location: { index: currentIndex },
-        rows: tableRows,
-        columns: 3
-      }
+    // Add each component as a formatted section
+    const componentSections: { startIndex: number, titleEndIndex: number, text: string }[] = [];
+    
+    content.components.forEach((comp) => {
+      const componentStartIndex = currentIndex;
+      
+      const componentTitle = `${comp.component}\n`;
+      const description = `\nDescription & Guidelines:\n${comp.description}\n`;
+      const practices = `\nTzofim Best Practices:\n${comp.bestPractices}\n`;
+      const timeStructure = `\nTime Structure:\n${comp.timeStructure}\n\n`;
+      
+      const fullText = componentTitle + description + practices + timeStructure;
+      
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: fullText
+        }
+      });
+      
+      componentSections.push({
+        startIndex: componentStartIndex,
+        titleEndIndex: componentStartIndex + componentTitle.length - 1,
+        text: fullText
+      });
+      
+      currentIndex += fullText.length;
     });
 
-    // After table is created, we need to populate it
-    // This requires a second batch of requests after the table exists
-    const updateResponse = await docs.documents.batchUpdate({
+    // Insert all text first
+    await docs.documents.batchUpdate({
       documentId,
       requestBody: { requests }
     });
 
-    // Now populate the table cells
-    const populateRequests: any[] = [];
+    // Now apply formatting
+    const formatRequests: any[] = [];
     
-    // Header row (approximate indices - these will be calculated based on table structure)
-    // Row 1: Headers
-    let rowStartIndex = currentIndex + 3; // Account for table structure
-    
-    // We'll use a simpler approach: insert all text first, then format
-    // This is more reliable than trying to calculate exact table cell indices
-    
-    // Style the title
-    populateRequests.push({
-      updateParagraphStyle: {
-        range: {
-          startIndex: 1,
-          endIndex: peula.title.length + 1
-        },
-        paragraphStyle: {
-          namedStyleType: 'HEADING_1'
-        },
-        fields: 'namedStyleType'
-      }
-    });
-
-    // Bold the title text
-    populateRequests.push({
+    // Format main title
+    formatRequests.push({
       updateTextStyle: {
         range: {
           startIndex: 1,
-          endIndex: peula.title.length + 1
+          endIndex: titleEndIndex + 1
         },
         textStyle: {
           bold: true,
           fontSize: {
-            magnitude: 18,
+            magnitude: 20,
             unit: 'PT'
           }
         },
@@ -171,49 +171,94 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
       }
     });
 
-    if (populateRequests.length > 0) {
+    // Format "Educational Goals:" as bold
+    formatRequests.push({
+      updateTextStyle: {
+        range: {
+          startIndex: goalsStartIndex,
+          endIndex: goalsStartIndex + 18
+        },
+        textStyle: {
+          bold: true,
+          fontSize: {
+            magnitude: 12,
+            unit: 'PT'
+          }
+        },
+        fields: 'bold,fontSize'
+      }
+    });
+
+    // Format "Peula Components" header
+    formatRequests.push({
+      updateTextStyle: {
+        range: {
+          startIndex: sectionHeaderStartIndex,
+          endIndex: sectionHeaderStartIndex + 17
+        },
+        textStyle: {
+          bold: true,
+          fontSize: {
+            magnitude: 16,
+            unit: 'PT'
+          }
+        },
+        fields: 'bold,fontSize'
+      }
+    });
+
+    // Format each component's title and section headers
+    componentSections.forEach((section) => {
+      // Bold the component title
+      formatRequests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: section.startIndex,
+            endIndex: section.titleEndIndex
+          },
+          textStyle: {
+            bold: true,
+            fontSize: {
+              magnitude: 14,
+              unit: 'PT'
+            }
+          },
+          fields: 'bold,fontSize'
+        }
+      });
+      
+      // Find and bold section headers within the component
+      const sectionHeaders = ['Description & Guidelines:', 'Tzofim Best Practices:', 'Time Structure:'];
+      sectionHeaders.forEach(header => {
+        const headerIndex = section.text.indexOf(header);
+        if (headerIndex !== -1) {
+          formatRequests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: section.startIndex + headerIndex,
+                endIndex: section.startIndex + headerIndex + header.length
+              },
+              textStyle: {
+                bold: true
+              },
+              fields: 'bold'
+            }
+          });
+        }
+      });
+    });
+
+    // Apply all formatting
+    if (formatRequests.length > 0) {
       await docs.documents.batchUpdate({
         documentId,
-        requestBody: { requests: populateRequests }
+        requestBody: { requests: formatRequests }
       });
     }
 
     // Create the document URL
     const documentUrl = `https://docs.google.com/document/d/${documentId}/edit`;
     
-    // For now, we'll create a simpler document with formatted text instead of complex table
-    // This ensures reliability while still providing good formatting
-    const simpleContentRequests: any[] = [];
-    let textIndex = currentIndex;
-
-    // Add table header text
-    const headerText = "Peula Component | Description & Guidelines | Tzofim Best Practices & Time\n" + "-".repeat(80) + "\n\n";
-    simpleContentRequests.push({
-      insertText: {
-        location: { index: textIndex },
-        text: headerText
-      }
-    });
-    textIndex += headerText.length;
-
-    // Add each component
-    content.components.forEach((comp, idx) => {
-      const componentText = `${comp.component}\n\nDescription & Guidelines:\n${comp.description}\n\nTzofim Best Practices:\n${comp.bestPractices}\n\nTime Structure:\n${comp.timeStructure}\n\n${"-".repeat(80)}\n\n`;
-      simpleContentRequests.push({
-        insertText: {
-          location: { index: textIndex },
-          text: componentText
-        }
-      });
-      textIndex += componentText.length;
-    });
-
-    // Update with simpler content
-    await docs.documents.batchUpdate({
-      documentId,
-      requestBody: { requests: simpleContentRequests }
-    });
-
     return documentUrl;
   } catch (error) {
     console.error("Error exporting to Google Docs:", error);
