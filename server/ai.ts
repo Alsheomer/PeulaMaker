@@ -84,24 +84,35 @@ ${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` 
 
 Create a professional, actionable peula with these 9 components. Be specific, practical, and aligned with Tzofim educational values.
 
+Tzofim Expertise & Educational DNA to apply:
+• Anchor everything in authentic Israeli Scouts culture (youth leading youth, Zionist identity, chevra/community, social responsibility, Hebrew terminology).
+• Map the age to the likely shichva (Ofarim, Tzofim, Tzofei Da-at, Shachbag) and calibrate language, independence, and challenge accordingly.
+• Follow the classic peula arc: opening "hitkhadshut" to set tone, experiential core "chomer" with active kvutza work, processing "iyun"/"sikkum" for reflection, and take-home "hishtalvut" action.
+• Showcase outdoor and creative movement where relevant (mifkad, masa, games, chetziot) and adapt to the specified environment while offering rain/indoor backups.
+• Give clear tafkidim (roles) for madrichim and chanichim, highlighting leadership rotation, kvutzat avoda / peulot shetach, and accessibility needs.
+• Tie every element back to Tzofim values like hadracha, teamwork, initiative, Israeli culture, manhigut, service, and Tnuat HaTzofim traditions.
+• Integrate iconic rituals (opening mifkad with "Ani Nodar", kvutzot ma'agal, shir peula, ma'avar games) and Israeli cultural anchors (holidays, landscapes, Hebrew slang) where appropriate.
+• Emphasize experiential learning that ends with concrete "ma'ase beshetach" or community follow-up so chanichim leave with actionable commitments.
+
 ${trainingExamples.length > 0 ? 'IMPORTANT: Study the training examples above and match the writing style, tone, structure, and level of detail shown in those examples. Create a peula that feels consistent with the user\'s own writing.' : ''}
 
 ${allFeedback.length > 0 ? 'Also use the feedback provided above to improve the quality of this peula by addressing common concerns and incorporating successful practices.' : ''}
 
 For each component provide:
-- Description: Clear, actionable content
-- Best Practices: Tzofim methodology and tips
-- Time Structure: Specific time breakdown
+- Description: Step-by-step instructions that reference Tzofim practices (use Hebrew terms with short translations on first use) and link activities to the peula arc.
+- Best Practices: Tzofim methodology, leadership focus, and facilitation tips.
+- Time Structure: Specific time breakdown that sums to the total duration, clarifying transitions between stages (opening, experience, processing, sikkum) and naming key transition signals (e.g., mifkad call, shir ma'avar).
 
 Guidelines:
 • Write naturally and professionally
 • Provide specific activities, not general advice
 • Include exact timing that adds up to the total duration
-• Use concrete examples and instructions
-• Integrate specified materials creatively
-• Apply Tzofim principles: experiential learning, active participation, reflection
-• Keep language clear and implementation-focused
-• Address safety, logistics, and facilitation practically
+• Use concrete examples and instructions (games, chants, mifkad ceremonies, patrol rotations, etc.)
+• Integrate specified materials creatively and suggest Tzofim-appropriate alternatives if needed
+• Apply Tzofim principles: experiential learning, active participation, reflection, leadership by youth, and chevra-building
+• Keep language clear and implementation-focused, noting accessibility and inclusion considerations (neurodiversity, physical access, language)
+• Address safety, logistics, and facilitation practically, especially for outdoor or physical elements, including Israeli Scouts risk management norms (briefings, buddy system, first-aid kit)
+• Suggest chants, songs, or closing quotes that reinforce the theme when natural
 
 Return valid JSON:
 {
@@ -244,7 +255,7 @@ ${context.specialConsiderations ? `Notes: ${context.specialConsiderations}` : ''
 
 Regenerate ONLY this section: ${sectionName}
 
-Provide fresh, creative content for this specific component while staying aligned with the context above. Be specific, actionable, and professional. If feedback is provided above, use it to improve the quality of this section by addressing concerns and incorporating successful practices.
+Provide fresh, creative content for this specific component while staying aligned with the context above. Be specific, actionable, and professional. Infuse it with authentic Tzofim methodology: highlight youth leadership, kvutza dynamics, Hebrew terminology (with translations on first use), shichva-appropriate challenge, and the peula arc from hitkhadshut to sikkum with clear transition cues. Reference iconic practices (mifkad, ma'agal, shir peula, masa) where natural, and anchor outcomes in Tzofim values and community action. If feedback is provided above, use it to improve the quality of this section by addressing concerns and incorporating successful practices.
 
 Return valid JSON:
 {
