@@ -261,7 +261,7 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
       if (cells[1]?.content?.[0]?.startIndex !== undefined) {
         cellInsertions.push({
           index: cells[1].content[0].startIndex,
-          text: `${idx + 1}`
+          text: String(idx + 1)
         });
       }
       
@@ -278,7 +278,7 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
       if (cells[3]?.content?.[0]?.startIndex !== undefined) {
         cellInsertions.push({
           index: cells[3].content[0].startIndex,
-          text: comp.timeStructure
+          text: String(comp.timeStructure || '')
         });
       }
       
@@ -289,7 +289,7 @@ export async function exportPeulaToGoogleDocs(peula: Peula): Promise<string> {
           : 'N/A';
         cellInsertions.push({
           index: cells[4].content[0].startIndex,
-          text: equipmentText
+          text: String(equipmentText)
         });
       }
     });
