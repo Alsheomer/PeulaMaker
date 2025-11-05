@@ -13,9 +13,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Peula, PeulaContent, Feedback } from "@shared/schema";
+import type { Peula, PeulaContent, Feedback, TrainingInsightsResponse } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 
 export default function PeulaView() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,13 @@ export default function PeulaView() {
     queryKey: ["/api/peulot", id, "feedback"],
     enabled: !!id,
   });
+
+  const { data: insightsResponse } = useQuery<TrainingInsightsResponse>({
+    queryKey: ["/api/training-examples", "insights"],
+  });
+
+  const trainingInsights = insightsResponse?.insights ?? null;
+  const insightsGeneratedAt = insightsResponse?.generatedAt ? new Date(insightsResponse.generatedAt) : null;
 
   const exportMutation = useMutation({
     mutationFn: async (peulaId: string) => {
@@ -169,6 +177,19 @@ export default function PeulaView() {
     [peula.ageGroup, peula.duration, peula.groupSize]
   );
 
+  const insightSections = useMemo(() => {
+    if (!trainingInsights) {
+      return [] as { title: string; items: string[] }[];
+    }
+
+    return [
+      { title: "Signature moves", items: trainingInsights.signatureMoves },
+      { title: "Facilitation focus", items: trainingInsights.facilitationFocus },
+      { title: "Reflection patterns", items: trainingInsights.reflectionPatterns },
+      { title: "Impact signals", items: trainingInsights.measurementFocus },
+    ].filter((section) => section.items.length > 0);
+  }, [trainingInsights]);
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 pb-24">
       <Button
@@ -231,6 +252,44 @@ export default function PeulaView() {
       </section>
 
       <section className="grid gap-6 md:grid-cols-[1.1fr]">
+        {trainingInsights && (
+          <Card className="border-border/70 bg-background/90" data-testid="card-peula-style-insights">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl font-semibold text-foreground">Style anchors from your uploads</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Based on {insightsResponse?.exampleCount ?? 0} stored peulot. This plan keeps your signature voice while adapting to the new context.
+              </p>
+              {insightsGeneratedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Insights refreshed {formatDistanceToNow(insightsGeneratedAt, { addSuffix: true })}
+                </p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-5 text-sm text-muted-foreground">
+              <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Voice & tone</p>
+                <p className="mt-2 whitespace-pre-wrap text-base text-foreground">{trainingInsights.voiceAndTone}</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {insightSections.map((section) => (
+                  <div key={`view-${section.title}`} className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{section.title}</p>
+                    <ul className="mt-2 space-y-2 text-sm leading-relaxed">
+                      {section.items.map((item, idx) => (
+                        <li key={`view-${section.title}-${idx}`} className="flex gap-3">
+                          <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary/60" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="border-border/70 bg-background/90">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-foreground">Educational goals</CardTitle>

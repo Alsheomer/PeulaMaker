@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { generatePeula, regenerateSection } from "./ai";
+import { generatePeula, regenerateSection, getTrainingInsightsSummary } from "./ai";
 import { exportPeulaToGoogleDocs, importGoogleDocsContent, listGoogleDocsFiles } from "./google-docs";
 import { questionnaireResponseSchema, insertFeedbackSchema, insertTrainingExampleSchema } from "@shared/schema";
 
@@ -199,6 +199,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching training examples:", error);
       res.status(500).json({ error: "Failed to fetch training examples" });
+    }
+  });
+
+  app.get("/api/training-examples/insights", async (_req, res) => {
+    try {
+      const summary = await getTrainingInsightsSummary();
+      if (!summary) {
+        return res.json({ insights: null, generatedAt: null, exampleCount: 0 });
+      }
+
+      res.json({
+        insights: summary.insights,
+        generatedAt: summary.generatedAt,
+        exampleCount: summary.exampleCount,
+      });
+    } catch (error) {
+      console.error("Error generating training insights:", error);
+      res.status(500).json({ error: "Failed to analyze training examples" });
     }
   });
 

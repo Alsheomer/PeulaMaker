@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { questionnaireResponseSchema, type QuestionnaireResponse } from "@shared/schema";
+import {
+  questionnaireResponseSchema,
+  type QuestionnaireResponse,
+  type TrainingInsightsResponse,
+  type Peula,
+} from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -23,11 +28,12 @@ import {
   UsersRound,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import type { Peula } from "@shared/schema";
 import { peulaTemplates, getTemplateById } from "@shared/templates";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDistanceToNow } from "date-fns";
 
 const iconMap = {
   Sparkles,
@@ -57,6 +63,12 @@ export default function CreatePeula() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("custom");
   const [currentStep, setCurrentStep] = useState(0);
   const [, setLocation] = useLocation();
+  const { data: insightsResponse, isLoading: insightsLoading } = useQuery<TrainingInsightsResponse>({
+    queryKey: ["/api/training-examples", "insights"],
+  });
+
+  const trainingInsights = insightsResponse?.insights ?? null;
+  const insightsGeneratedAt = insightsResponse?.generatedAt ? new Date(insightsResponse.generatedAt) : null;
 
   const form = useForm<QuestionnaireResponse>({
     resolver: zodResolver(questionnaireResponseSchema),
@@ -165,6 +177,18 @@ export default function CreatePeula() {
   };
 
   const watchedValues = form.watch();
+  const insightSections = useMemo(() => {
+    if (!trainingInsights) {
+      return [] as { title: string; items: string[] }[];
+    }
+
+    return [
+      { title: "Signature moves", items: trainingInsights.signatureMoves },
+      { title: "Facilitation focus", items: trainingInsights.facilitationFocus },
+      { title: "Reflection patterns", items: trainingInsights.reflectionPatterns },
+      { title: "Impact signals", items: trainingInsights.measurementFocus },
+    ].filter((section) => section.items.length > 0);
+  }, [trainingInsights]);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 pb-24">
@@ -239,20 +263,74 @@ export default function CreatePeula() {
             </div>
           </div>
 
-          <Card className="h-full border-border/70 bg-background/90">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-foreground">What’s inside each template?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
-              <p>Templates reflect popular Tzofim program arcs—like identity exploration or outdoor leadership—complete with recommended tone and goals.</p>
-              <p>
-                When you generate a peula you can regenerate individual sections, add feedback, and export to Google Docs, so you’re always in control of the final plan.
-              </p>
-              <p className="rounded-xl border border-border/60 bg-background/80 p-4 text-primary">
-                Already know your approach? Choose “Custom build” and you’ll start with a clean slate.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {insightsLoading && (
+              <Card className="border-border/70 bg-background/90">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-foreground">Studying your peulot…</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-5/6" />
+                  <Skeleton className="h-3 w-2/3" />
+                </CardContent>
+              </Card>
+            )}
+
+            {!insightsLoading && trainingInsights && (
+              <Card className="border-border/70 bg-background/90" data-testid="card-training-insights">
+                <CardHeader className="space-y-1">
+                  <CardTitle className="text-lg font-semibold text-foreground">Study from your peulot</CardTitle>
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                    {insightsResponse?.exampleCount ?? 0} uploads analyzed
+                  </p>
+                  {insightsGeneratedAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Refreshed {formatDistanceToNow(insightsGeneratedAt, { addSuffix: true })}
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="rounded-xl border border-border/60 bg-background/80 p-4 text-sm text-foreground">
+                    <p className="font-medium text-foreground">Voice & tone</p>
+                    <p className="mt-2 text-muted-foreground">{trainingInsights.voiceAndTone}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {insightSections.map((section) => (
+                      <div key={section.title}>
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{section.title}</p>
+                        <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                          {section.items.map((item, idx) => (
+                            <li key={`${section.title}-${idx}`} className="flex gap-3">
+                              <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary/60" />
+                              <span className="leading-relaxed">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="h-full border-border/70 bg-background/90">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-foreground">What’s inside each template?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+                <p>Templates reflect popular Tzofim program arcs—like identity exploration or outdoor leadership—complete with recommended tone and goals.</p>
+                <p>
+                  When you generate a peula you can regenerate individual sections, add feedback, and export to Google Docs, so you’re always in control of the final plan.
+                </p>
+                <p className="rounded-xl border border-border/60 bg-background/80 p-4 text-primary">
+                  Already know your approach? Choose “Custom build” and you’ll start with a clean slate.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </section>
       ) : (
         <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
@@ -512,58 +590,93 @@ export default function CreatePeula() {
               )}
 
               {currentStep === 4 && (
-                <Card className="border-border/60 bg-background/90">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-semibold text-foreground">Review summary</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6 text-sm text-muted-foreground">
-                    <div className="grid gap-6 md:grid-cols-2">
-                      {[ 
-                        { label: "Template", value: getTemplateById(selectedTemplate)?.name ?? "Custom build" },
-                        { label: "Topic", value: watchedValues.topic || "—" },
-                        { label: "Goals", value: watchedValues.goals || "—" },
-                        { label: "Age group", value: watchedValues.ageGroup || "—" },
-                        { label: "Duration", value: watchedValues.duration || "—" },
-                        { label: "Group size", value: watchedValues.groupSize || "—" },
-                      ].map(({ label, value }) => (
-                        <div key={label} className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{label}</p>
-                          <p className="mt-2 text-base font-medium text-foreground whitespace-pre-wrap">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Materials</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {(watchedValues.availableMaterials?.length ?? 0) > 0 ? (
-                          watchedValues.availableMaterials?.map((material) => {
-                            const label = materialOptions.find((option) => option.value === material)?.label ?? material;
-                            return (
-                              <span
-                                key={material}
-                                className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
-                              >
-                                {label}
-                              </span>
-                            );
-                          })
-                        ) : (
-                          <span className="text-sm text-muted-foreground">No materials selected</span>
-                        )}
+                <>
+                  <Card className="border-border/60 bg-background/90">
+                    <CardHeader>
+                      <CardTitle className="text-xl font-semibold text-foreground">Review summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6 text-sm text-muted-foreground">
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {[
+                          { label: "Template", value: getTemplateById(selectedTemplate)?.name ?? "Custom build" },
+                          { label: "Topic", value: watchedValues.topic || "—" },
+                          { label: "Goals", value: watchedValues.goals || "—" },
+                          { label: "Age group", value: watchedValues.ageGroup || "—" },
+                          { label: "Duration", value: watchedValues.duration || "—" },
+                          { label: "Group size", value: watchedValues.groupSize || "—" },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{label}</p>
+                            <p className="mt-2 text-base font-medium text-foreground whitespace-pre-wrap">{value}</p>
+                          </div>
+                        ))}
                       </div>
-                    </div>
 
-                    {watchedValues.specialConsiderations && (
                       <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Special considerations</p>
-                        <p className="mt-2 whitespace-pre-wrap text-base text-foreground">
-                          {watchedValues.specialConsiderations}
-                        </p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Materials</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {(watchedValues.availableMaterials?.length ?? 0) > 0 ? (
+                            watchedValues.availableMaterials?.map((material) => {
+                              const label = materialOptions.find((option) => option.value === material)?.label ?? material;
+                              return (
+                                <span
+                                  key={material}
+                                  className="rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                                >
+                                  {label}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No materials selected</span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+
+                      {watchedValues.specialConsiderations && (
+                        <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Special considerations</p>
+                          <p className="mt-2 whitespace-pre-wrap text-base text-foreground">
+                            {watchedValues.specialConsiderations}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {trainingInsights && (
+                    <Card className="border-border/60 bg-background/90" data-testid="card-review-insights">
+                      <CardHeader>
+                        <CardTitle className="text-xl font-semibold text-foreground">How the AI will tailor this peula</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Your uploaded peulot teach Peula Maker what “good” looks like. Expect the generation to emphasize these hallmarks while blending in your current context.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-5 text-sm text-muted-foreground">
+                        <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Voice & tone</p>
+                          <p className="mt-2 whitespace-pre-wrap text-base text-foreground">{trainingInsights.voiceAndTone}</p>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {insightSections.map((section) => (
+                            <div key={`review-${section.title}`} className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{section.title}</p>
+                              <ul className="mt-2 space-y-2 text-sm leading-relaxed">
+                                {section.items.map((item, idx) => (
+                                  <li key={`review-${section.title}-${idx}`} className="flex gap-3">
+                                    <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary/60" />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-4">
