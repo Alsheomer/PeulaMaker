@@ -1,7 +1,125 @@
 import OpenAI from "openai";
-import type { QuestionnaireResponse, PeulaContent, Feedback } from "@shared/schema";
+import type {
+  QuestionnaireResponse,
+  PeulaContent,
+  Feedback,
+  TrainingExample,
+  TrainingInsights,
+} from "@shared/schema";
 import { getTemplateById } from "@shared/templates";
 import { storage } from "./storage";
+
+interface TrainingInsightsCache {
+  fingerprint: string;
+  generatedAt: string;
+  exampleCount: number;
+  insights: TrainingInsights;
+}
+
+let trainingInsightsCache: TrainingInsightsCache | null = null;
+
+function createExamplesFingerprint(examples: TrainingExample[]): string {
+  return examples
+    .map((example) => `${example.id}:${example.createdAt}:${example.content.length}:${example.notes ?? ""}`)
+    .sort()
+    .join("|");
+}
+
+function buildExampleDigest(examples: TrainingExample[]): string {
+  return examples
+    .slice(0, 5)
+    .map((example, idx) => {
+      const truncatedContent = example.content.length > 1500
+        ? `${example.content.slice(0, 1500)}...`
+        : example.content;
+      const notes = example.notes ? `Notes: ${example.notes}` : "";
+      return `Example ${idx + 1}: ${example.title}\n${truncatedContent}\n${notes}`.trim();
+    })
+    .join("\n\n");
+}
+
+export async function getTrainingInsightsSummary(
+  preloadedExamples?: TrainingExample[],
+): Promise<TrainingInsightsCache | null> {
+  const examples = preloadedExamples ?? await storage.getAllTrainingExamples();
+
+  if (examples.length === 0) {
+    trainingInsightsCache = null;
+    return null;
+  }
+
+  const fingerprint = createExamplesFingerprint(examples);
+  if (trainingInsightsCache && trainingInsightsCache.fingerprint === fingerprint) {
+    return trainingInsightsCache;
+  }
+
+  const digest = buildExampleDigest(examples);
+
+  const prompt = `You are studying ${examples.length} Tzofim (Israeli Scouts) peulot written by a madrich. Identify what makes the user's approach distinct and useful for future AI generations.\n\nPeulot Samples:\n${digest}\n\nReturn strict JSON summarizing their style with this shape:\n{\n  "voiceAndTone": "One paragraph capturing voice, energy, and pacing.",\n  "signatureMoves": ["3-5 bullet points highlighting recurring activity patterns or structures."],\n  "facilitationFocus": ["3-5 bullet points describing how they lead or support chanichim."],\n  "reflectionPatterns": ["3-4 bullet points on how they process learning or run sicha/debrief."],\n  "measurementFocus": ["3-4 bullet points explaining how success or impact shows up in their writing."]\n}\nUse direct, actionable language.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert instructional designer. Analyze provided peulot and summarize distinctive style signals. Always respond with valid JSON.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 2048,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("No content received from AI while generating training insights");
+    }
+
+    const parsed = JSON.parse(content);
+
+    if (
+      typeof parsed.voiceAndTone !== "string" ||
+      !Array.isArray(parsed.signatureMoves) ||
+      !Array.isArray(parsed.facilitationFocus) ||
+      !Array.isArray(parsed.reflectionPatterns) ||
+      !Array.isArray(parsed.measurementFocus)
+    ) {
+      throw new Error("Invalid training insights structure from AI");
+    }
+
+    const sanitizedList = (items: unknown[]): string[] =>
+      items
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter((item) => item.length > 0);
+
+    const insights: TrainingInsights = {
+      voiceAndTone: parsed.voiceAndTone.trim(),
+      signatureMoves: sanitizedList(parsed.signatureMoves),
+      facilitationFocus: sanitizedList(parsed.facilitationFocus),
+      reflectionPatterns: sanitizedList(parsed.reflectionPatterns),
+      measurementFocus: sanitizedList(parsed.measurementFocus),
+    };
+
+    trainingInsightsCache = {
+      fingerprint,
+      generatedAt: new Date().toISOString(),
+      exampleCount: examples.length,
+      insights,
+    };
+
+    return trainingInsightsCache;
+  } catch (error) {
+    console.error("Error generating training insights:", error);
+    if (trainingInsightsCache && trainingInsightsCache.fingerprint === fingerprint) {
+      return trainingInsightsCache;
+    }
+    return trainingInsightsCache;
+  }
+}
 
 // This is using Replit's AI Integrations service, which provides OpenAI-compatible API access without requiring your own OpenAI API key.
 // Reference: blueprint:javascript_openai_ai_integrations
@@ -19,6 +137,7 @@ export async function generatePeula(responses: QuestionnaireResponse): Promise<{
 
   // Fetch training examples to learn user's writing style
   const trainingExamples = await storage.getAllTrainingExamples();
+  const trainingInsightsSummary = await getTrainingInsightsSummary(trainingExamples);
   let trainingContext = "";
   if (trainingExamples.length > 0) {
     trainingContext = "\n\nTraining Examples (Peulot you've written - match this writing style and quality):\n\n";
@@ -30,6 +149,13 @@ export async function generatePeula(responses: QuestionnaireResponse): Promise<{
       }
       trainingContext += "\n";
     });
+  }
+
+  let insightsContext = "";
+  if (trainingInsightsSummary) {
+    const joinList = (items: string[]) => items.map((item) => `- ${item}`).join("\n");
+    const { insights, exampleCount } = trainingInsightsSummary;
+    insightsContext = `\n\nStyle Insights from ${exampleCount} uploaded peulot (preserve these hallmarks):\nVoice & Tone: ${insights.voiceAndTone}\nSignature Moves:\n${joinList(insights.signatureMoves)}\nFacilitation Focus:\n${joinList(insights.facilitationFocus)}\nReflection Patterns:\n${joinList(insights.reflectionPatterns)}\nMeasurement Focus:\n${joinList(insights.measurementFocus)}\nMaintain these qualities while adapting to the new context.`;
   }
 
   // Fetch all feedback to learn from past peulot
@@ -80,7 +206,7 @@ Duration: ${responses.duration} minutes
 Group Size: ${responses.groupSize}
 Goals: ${responses.goals}${templateContext}
 ${responses.availableMaterials && responses.availableMaterials.length > 0 ? `Available Materials: ${responses.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
-${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}${trainingContext}${feedbackContext}
+${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}${trainingContext}${insightsContext}${feedbackContext}
 
 Create a professional, actionable peula with these 9 components. Be specific, practical, and aligned with Tzofim educational values.
 
@@ -102,6 +228,7 @@ Guidelines:
 • Apply Tzofim principles: experiential learning, active participation, reflection
 • Keep language clear and implementation-focused
 • Address safety, logistics, and facilitation practically
+• Align with the user's style insights described above
 
 Return valid JSON:
 {

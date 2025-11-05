@@ -61,6 +61,20 @@ export const insertTrainingExampleSchema = createInsertSchema(trainingExamples).
 export type InsertTrainingExample = z.infer<typeof insertTrainingExampleSchema>;
 export type TrainingExample = typeof trainingExamples.$inferSelect;
 
+export interface TrainingInsights {
+  voiceAndTone: string;
+  signatureMoves: string[];
+  facilitationFocus: string[];
+  reflectionPatterns: string[];
+  measurementFocus: string[];
+}
+
+export interface TrainingInsightsResponse {
+  insights: TrainingInsights | null;
+  generatedAt: string | null;
+  exampleCount: number;
+}
+
 // Questionnaire response schema (for frontend state)
 export const questionnaireResponseSchema = z.object({
   templateId: z.string().optional(),
