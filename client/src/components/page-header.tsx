@@ -69,14 +69,14 @@ function GradientBackdrop() {
     <Fragment>
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_circle_at_10%_0%,theme(colors.primary/15),transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_circle_at_10%_0%,hsl(var(--primary) / 0.15),transparent_55%)]"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       />
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(500px_circle_at_95%_40%,theme(colors.primary/10),transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(500px_circle_at_95%_40%,hsl(var(--primary) / 0.1),transparent_55%)]"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.9, ease: "easeOut", delay: 0.1 }}

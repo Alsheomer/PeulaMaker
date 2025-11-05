@@ -21,9 +21,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   return (
-    <div className="relative min-h-screen bg-[radial-gradient(circle_at_top,theme(colors.primary/9),transparent_45%)]">
-      <div className="pointer-events-none fixed inset-0 -z-30 opacity-[0.12] [background-image:linear-gradient(to_right,theme(colors.border/40)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.border/40)_1px,transparent_1px)] [background-size:80px_80px]" aria-hidden="true" />
-      <div className="pointer-events-none fixed inset-0 -z-20 bg-[radial-gradient(800px_circle_at_top_left,theme(colors.primary/12),transparent_55%)]" />
+    <div className="relative min-h-screen bg-[radial-gradient(circle_at_top,hsl(var(--primary) / 0.09),transparent_45%)]">
+      <div className="pointer-events-none fixed inset-0 -z-30 opacity-[0.12] [background-image:linear-gradient(to_right,hsl(var(--border) / 0.4)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border) / 0.4)_1px,transparent_1px)] [background-size:80px_80px]" aria-hidden="true" />
+      <div className="pointer-events-none fixed inset-0 -z-20 bg-[radial-gradient(800px_circle_at_top_left,hsl(var(--primary) / 0.12),transparent_55%)]" />
       <div className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-background via-background/95 to-muted/50" />
 
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
