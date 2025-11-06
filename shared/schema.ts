@@ -37,6 +37,14 @@ export const trainingExamples = pgTable("training_examples", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+export const tzofimAnchors = pgTable("tzofim_anchors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  text: text("text").notNull(),
+  category: text("category").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
 export const insertPeulaSchema = createInsertSchema(peulot).omit({
   id: true,
   createdAt: true,
@@ -60,6 +68,50 @@ export const insertTrainingExampleSchema = createInsertSchema(trainingExamples).
 
 export type InsertTrainingExample = z.infer<typeof insertTrainingExampleSchema>;
 export type TrainingExample = typeof trainingExamples.$inferSelect;
+
+const baseInsertAnchorSchema = createInsertSchema(tzofimAnchors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTzofimAnchorSchema = baseInsertAnchorSchema.extend({
+  displayOrder: baseInsertAnchorSchema.shape.displayOrder.optional(),
+});
+
+export type InsertTzofimAnchor = z.infer<typeof insertTzofimAnchorSchema>;
+export type TzofimAnchor = typeof tzofimAnchors.$inferSelect;
+
+export const defaultTzofimAnchors: ReadonlyArray<{
+  text: string;
+  category: string;
+  displayOrder: number;
+}> = [
+  {
+    text: "Peulot balance action, creativity, and kvutzah connection so every chanich feels seen and energized.",
+    category: "Educational DNA",
+    displayOrder: 1,
+  },
+  {
+    text: "Kol Yachad: plan with roles, rotating leadership, and concrete ways chanichim practice responsibility.",
+    category: "Leadership",
+    displayOrder: 2,
+  },
+  {
+    text: "Embed Eretz Yisrael and Jewish peoplehood through stories, symbols, and reflective questions tied to lived experience.",
+    category: "Content Anchors",
+    displayOrder: 3,
+  },
+  {
+    text: "Always close with structured reflection that connects actions to values and next steps back in the shevet.",
+    category: "Reflection",
+    displayOrder: 4,
+  },
+  {
+    text: "Logistics and safety are proactive: scout the space, prep materials, and assign backups before chevraya arrives.",
+    category: "Readiness",
+    displayOrder: 5,
+  },
+];
 
 export interface TrainingInsights {
   voiceAndTone: string;

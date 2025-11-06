@@ -1,6 +1,22 @@
-import { type User, type InsertUser, type Peula, type InsertPeula, type Feedback, type InsertFeedback, type TrainingExample, type InsertTrainingExample, users, peulot, feedback, trainingExamples } from "@shared/schema";
+import {
+  type User,
+  type InsertUser,
+  type Peula,
+  type InsertPeula,
+  type Feedback,
+  type InsertFeedback,
+  type TrainingExample,
+  type InsertTrainingExample,
+  type TzofimAnchor,
+  type InsertTzofimAnchor,
+  users,
+  peulot,
+  feedback,
+  trainingExamples,
+  tzofimAnchors,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
-import { eq, desc } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "./db";
 
 // Storage interface for both users and peulot
@@ -27,6 +43,16 @@ export interface IStorage {
   getAllTrainingExamples(): Promise<TrainingExample[]>;
   createTrainingExample(example: InsertTrainingExample): Promise<TrainingExample>;
   deleteTrainingExample(id: string): Promise<void>;
+
+  // Tzofim anchor methods
+  getTzofimAnchors(): Promise<TzofimAnchor[]>;
+  createTzofimAnchor(anchor: InsertTzofimAnchor): Promise<TzofimAnchor>;
+  updateTzofimAnchor(
+    id: string,
+    updates: Partial<Omit<InsertTzofimAnchor, "displayOrder">> & { displayOrder?: number },
+  ): Promise<TzofimAnchor | undefined>;
+  deleteTzofimAnchor(id: string): Promise<void>;
+  reorderTzofimAnchors(order: string[]): Promise<TzofimAnchor[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -34,12 +60,14 @@ export class MemStorage implements IStorage {
   private peulot: Map<string, Peula>;
   private feedback: Map<string, Feedback>;
   private trainingExamples: Map<string, TrainingExample>;
+  private tzofimAnchors: Map<string, TzofimAnchor>;
 
   constructor() {
     this.users = new Map();
     this.peulot = new Map();
     this.feedback = new Map();
     this.trainingExamples = new Map();
+    this.tzofimAnchors = new Map();
   }
 
   // User methods
@@ -146,6 +174,66 @@ export class MemStorage implements IStorage {
 
   async deleteTrainingExample(id: string): Promise<void> {
     this.trainingExamples.delete(id);
+  }
+
+  // Tzofim anchor methods
+  async getTzofimAnchors(): Promise<TzofimAnchor[]> {
+    return Array.from(this.tzofimAnchors.values()).sort((a, b) => {
+      if (a.displayOrder === b.displayOrder) {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      return a.displayOrder - b.displayOrder;
+    });
+  }
+
+  async createTzofimAnchor(insertAnchor: InsertTzofimAnchor): Promise<TzofimAnchor> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const existing = await this.getTzofimAnchors();
+    const nextOrder = existing.length > 0 ? Math.max(...existing.map((anchor) => anchor.displayOrder)) + 1 : 1;
+    const displayOrder = insertAnchor.displayOrder ?? nextOrder;
+
+    const anchor: TzofimAnchor = {
+      ...insertAnchor,
+      id,
+      createdAt: now,
+      displayOrder,
+    };
+
+    this.tzofimAnchors.set(id, anchor);
+    return anchor;
+  }
+
+  async updateTzofimAnchor(
+    id: string,
+    updates: Partial<Omit<InsertTzofimAnchor, "displayOrder">> & { displayOrder?: number },
+  ): Promise<TzofimAnchor | undefined> {
+    const existing = this.tzofimAnchors.get(id);
+    if (!existing) return undefined;
+
+    const updated: TzofimAnchor = {
+      ...existing,
+      ...updates,
+      displayOrder: updates.displayOrder ?? existing.displayOrder,
+    };
+
+    this.tzofimAnchors.set(id, updated);
+    return updated;
+  }
+
+  async deleteTzofimAnchor(id: string): Promise<void> {
+    this.tzofimAnchors.delete(id);
+  }
+
+  async reorderTzofimAnchors(order: string[]): Promise<TzofimAnchor[]> {
+    order.forEach((id, index) => {
+      const anchor = this.tzofimAnchors.get(id);
+      if (anchor) {
+        this.tzofimAnchors.set(id, { ...anchor, displayOrder: index + 1 });
+      }
+    });
+
+    return this.getTzofimAnchors();
   }
 }
 
@@ -257,6 +345,74 @@ export class DbStorage implements IStorage {
 
   async deleteTrainingExample(id: string): Promise<void> {
     await db.delete(trainingExamples).where(eq(trainingExamples.id, id));
+  }
+
+  // Tzofim anchor methods
+  async getTzofimAnchors(): Promise<TzofimAnchor[]> {
+    return await db.select().from(tzofimAnchors).orderBy(asc(tzofimAnchors.displayOrder), asc(tzofimAnchors.createdAt));
+  }
+
+  async createTzofimAnchor(insertAnchor: InsertTzofimAnchor): Promise<TzofimAnchor> {
+    const id = randomUUID();
+    const createdAt = new Date().toISOString();
+    const existing = await this.getTzofimAnchors();
+    const nextOrder = existing.length > 0 ? Math.max(...existing.map((anchor) => anchor.displayOrder)) + 1 : 1;
+    const displayOrder = insertAnchor.displayOrder ?? nextOrder;
+
+    const anchor: TzofimAnchor = {
+      ...insertAnchor,
+      id,
+      createdAt,
+      displayOrder,
+    };
+
+    await db.insert(tzofimAnchors).values(anchor);
+    return anchor;
+  }
+
+  async updateTzofimAnchor(
+    id: string,
+    updates: Partial<Omit<InsertTzofimAnchor, "displayOrder">> & { displayOrder?: number },
+  ): Promise<TzofimAnchor | undefined> {
+    const [existing] = await db.select().from(tzofimAnchors).where(eq(tzofimAnchors.id, id)).limit(1);
+    if (!existing) {
+      return undefined;
+    }
+
+    const updated: TzofimAnchor = {
+      ...existing,
+      ...updates,
+      displayOrder: updates.displayOrder ?? existing.displayOrder,
+    };
+
+    await db
+      .update(tzofimAnchors)
+      .set({
+        text: updated.text,
+        category: updated.category,
+        displayOrder: updated.displayOrder,
+      })
+      .where(eq(tzofimAnchors.id, id));
+
+    return updated;
+  }
+
+  async deleteTzofimAnchor(id: string): Promise<void> {
+    await db.delete(tzofimAnchors).where(eq(tzofimAnchors.id, id));
+  }
+
+  async reorderTzofimAnchors(order: string[]): Promise<TzofimAnchor[]> {
+    await db.transaction(async (tx) => {
+      for (let index = 0; index < order.length; index++) {
+        const id = order[index];
+        await tx
+          .update(tzofimAnchors)
+          .set({ displayOrder: index + 1 })
+          .where(eq(tzofimAnchors.id, id));
+      }
+    });
+
+    return this.getTzofimAnchors();
   }
 }
 

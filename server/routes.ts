@@ -3,9 +3,96 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generatePeula, regenerateSection, getTrainingInsightsSummary } from "./ai";
 import { exportPeulaToGoogleDocs, importGoogleDocsContent, listGoogleDocsFiles } from "./google-docs";
-import { questionnaireResponseSchema, insertFeedbackSchema, insertTrainingExampleSchema } from "@shared/schema";
+import {
+  questionnaireResponseSchema,
+  insertFeedbackSchema,
+  insertTrainingExampleSchema,
+  insertTzofimAnchorSchema,
+} from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const updateAnchorSchema = insertTzofimAnchorSchema.partial();
+
+  // Tzofim knowledge anchors
+  app.get("/api/tzofim-anchors", async (_req, res) => {
+    try {
+      const anchors = await storage.getTzofimAnchors();
+      res.json(anchors);
+    } catch (error) {
+      console.error("Error fetching Tzofim anchors:", error);
+      res.status(500).json({ error: "Failed to fetch Tzofim anchors" });
+    }
+  });
+
+  app.post("/api/tzofim-anchors", async (req, res) => {
+    try {
+      const validation = insertTzofimAnchorSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Invalid anchor data",
+          details: validation.error.errors,
+        });
+      }
+
+      const anchor = await storage.createTzofimAnchor(validation.data);
+      res.json(anchor);
+    } catch (error) {
+      console.error("Error creating Tzofim anchor:", error);
+      res.status(500).json({ error: "Failed to create Tzofim anchor" });
+    }
+  });
+
+  app.patch("/api/tzofim-anchors/:id", async (req, res) => {
+    try {
+      const validation = updateAnchorSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Invalid anchor update",
+          details: validation.error.errors,
+        });
+      }
+
+      const updated = await storage.updateTzofimAnchor(req.params.id, validation.data);
+      if (!updated) {
+        return res.status(404).json({ error: "Anchor not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating Tzofim anchor:", error);
+      res.status(500).json({ error: "Failed to update Tzofim anchor" });
+    }
+  });
+
+  app.delete("/api/tzofim-anchors/:id", async (req, res) => {
+    try {
+      await storage.deleteTzofimAnchor(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting Tzofim anchor:", error);
+      res.status(500).json({ error: "Failed to delete Tzofim anchor" });
+    }
+  });
+
+  app.post("/api/tzofim-anchors/reorder", async (req, res) => {
+    try {
+      const validation = z.object({ ids: z.array(z.string()) }).safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: "Invalid reorder payload",
+          details: validation.error.errors,
+        });
+      }
+
+      const anchors = await storage.reorderTzofimAnchors(validation.data.ids);
+      res.json(anchors);
+    } catch (error) {
+      console.error("Error reordering Tzofim anchors:", error);
+      res.status(500).json({ error: "Failed to reorder Tzofim anchors" });
+    }
+  });
+
   // Get all peulot
   app.get("/api/peulot", async (_req, res) => {
     try {
