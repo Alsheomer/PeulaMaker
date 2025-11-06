@@ -6,7 +6,10 @@ import {
   type QuestionnaireResponse,
   type TrainingInsightsResponse,
   type Peula,
+  type TzofimAnchor,
+  defaultTzofimAnchors,
 } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -66,9 +69,37 @@ export default function CreatePeula() {
   const { data: insightsResponse, isLoading: insightsLoading } = useQuery<TrainingInsightsResponse>({
     queryKey: ["/api/training-examples", "insights"],
   });
+  const { data: tzofimAnchors = [] } = useQuery<TzofimAnchor[]>({
+    queryKey: ["/api/tzofim-anchors"],
+  });
 
   const trainingInsights = insightsResponse?.insights ?? null;
   const insightsGeneratedAt = insightsResponse?.generatedAt ? new Date(insightsResponse.generatedAt) : null;
+  const usingFallbackAnchors = tzofimAnchors.length === 0;
+
+  const anchorPreview = useMemo(
+    () =>
+      (tzofimAnchors.length === 0
+        ? [...defaultTzofimAnchors]
+        : tzofimAnchors.map(({ text, category, displayOrder }) => ({ text, category, displayOrder })))
+        .sort((a, b) => a.displayOrder - b.displayOrder),
+    [tzofimAnchors],
+  );
+
+  const anchorGroups = useMemo(
+    () => {
+      const grouped = anchorPreview.reduce<Record<string, string[]>>((acc, anchor) => {
+        if (!acc[anchor.category]) {
+          acc[anchor.category] = [];
+        }
+        acc[anchor.category].push(anchor.text);
+        return acc;
+      }, {});
+
+      return Object.entries(grouped).map(([category, items]) => ({ category, items }));
+    },
+    [anchorPreview],
+  );
 
   const form = useForm<QuestionnaireResponse>({
     resolver: zodResolver(questionnaireResponseSchema),
@@ -641,6 +672,46 @@ export default function CreatePeula() {
                           </p>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-border/60 bg-background/90" data-testid="card-review-anchors">
+                    <CardHeader>
+                      <CardTitle className="text-xl font-semibold text-foreground">Institutional anchors in play</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        These cues are injected into the AI prompt before generation so the peula honors core Tzofim practices.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-5 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Badge
+                          variant="outline"
+                          className="border-primary/50 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary"
+                        >
+                          {usingFallbackAnchors ? "Default set" : "Custom set"}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {usingFallbackAnchors
+                            ? "Customize anchors in Settings → AI training studio to override these defaults."
+                            : "Manage anchors in Settings → AI training studio."}
+                        </span>
+                      </div>
+
+                      <div className="space-y-4">
+                        {anchorGroups.map((group) => (
+                          <div key={`review-anchors-${group.category}`} className="rounded-2xl border border-border/60 bg-background/80 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">{group.category}</p>
+                            <ul className="mt-2 space-y-2 text-sm leading-relaxed text-foreground">
+                              {group.items.map((item, idx) => (
+                                <li key={`review-anchors-${group.category}-${idx}`} className="flex gap-3">
+                                  <span className="mt-1 h-1.5 w-1.5 flex-none rounded-full bg-primary/60" />
+                                  <span>{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
 

@@ -5,7 +5,9 @@ import type {
   Feedback,
   TrainingExample,
   TrainingInsights,
+  TzofimAnchor,
 } from "@shared/schema";
+import { defaultTzofimAnchors } from "@shared/schema";
 import { getTemplateById } from "@shared/templates";
 import { storage } from "./storage";
 
@@ -17,6 +19,57 @@ interface TrainingInsightsCache {
 }
 
 let trainingInsightsCache: TrainingInsightsCache | null = null;
+
+type AnchorForPrompt = Pick<TzofimAnchor, "text" | "category" | "displayOrder">;
+
+async function loadAnchorSet(): Promise<AnchorForPrompt[]> {
+  const anchors = await storage.getTzofimAnchors();
+  if (!anchors.length) {
+    return [...defaultTzofimAnchors];
+  }
+
+  return anchors
+    .map((anchor) => ({
+      text: anchor.text,
+      category: anchor.category,
+      displayOrder: anchor.displayOrder,
+    }))
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+}
+
+function buildAnchorContext(anchors: AnchorForPrompt[]): string {
+  if (anchors.length === 0) {
+    return "";
+  }
+
+  const grouped = anchors.reduce<Record<string, AnchorForPrompt[]>>((acc, anchor) => {
+    if (!acc[anchor.category]) {
+      acc[anchor.category] = [];
+    }
+    acc[anchor.category].push(anchor);
+    return acc;
+  }, {});
+
+  const sections = Object.entries(grouped)
+    .sort((a, b) => {
+      const first = a[1][0]?.displayOrder ?? 0;
+      const second = b[1][0]?.displayOrder ?? 0;
+      return first - second;
+    })
+    .map(([category, items]) => {
+      const bullets = items
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((item) => `- ${item.text}`)
+        .join("\n");
+      return `${category}:\n${bullets}`;
+    });
+
+  if (!sections.length) {
+    return "";
+  }
+
+  return `\n\nTzofim Institutional Knowledge Anchors (non-negotiable context to honor):\n${sections.join("\n\n")}`;
+}
 
 function createExamplesFingerprint(examples: TrainingExample[]): string {
   return examples
@@ -131,9 +184,12 @@ const openai = new OpenAI({
 export async function generatePeula(responses: QuestionnaireResponse): Promise<{ title: string; content: PeulaContent }> {
   const templateId = responses.templateId || "custom";
   const template = getTemplateById(templateId);
-  const templateContext = template && template.id !== "custom" 
-    ? `\nTemplate Used: ${template.name} - ${template.description}` 
+  const templateContext = template && template.id !== "custom"
+    ? `\nTemplate Used: ${template.name} - ${template.description}`
     : "";
+
+  const anchorSet = await loadAnchorSet();
+  const anchorContext = buildAnchorContext(anchorSet);
 
   // Fetch training examples to learn user's writing style
   const trainingExamples = await storage.getAllTrainingExamples();
@@ -206,7 +262,7 @@ Duration: ${responses.duration} minutes
 Group Size: ${responses.groupSize}
 Goals: ${responses.goals}${templateContext}
 ${responses.availableMaterials && responses.availableMaterials.length > 0 ? `Available Materials: ${responses.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
-${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}${trainingContext}${insightsContext}${feedbackContext}
+${responses.specialConsiderations ? `Notes: ${responses.specialConsiderations}` : ''}${anchorContext}${trainingContext}${insightsContext}${feedbackContext}
 
 Create a professional, actionable peula with these 9 components. Be specific, practical, and aligned with Tzofim educational values.
 
@@ -358,6 +414,9 @@ export async function regenerateSection(
     });
   }
 
+  const anchorSet = await loadAnchorSet();
+  const anchorContext = buildAnchorContext(anchorSet);
+
   const prompt = `You are regenerating a specific section of a Tzofim peula.
 
 Context:
@@ -367,7 +426,7 @@ Duration: ${context.duration}
 Group Size: ${context.groupSize}
 Goals: ${context.goals}
 ${context.availableMaterials && context.availableMaterials.length > 0 ? `Materials: ${context.availableMaterials.map(m => m.replace(/-/g, ' ')).join(', ')}` : ''}
-${context.specialConsiderations ? `Notes: ${context.specialConsiderations}` : ''}${feedbackContext}
+${context.specialConsiderations ? `Notes: ${context.specialConsiderations}` : ''}${anchorContext}${feedbackContext}
 
 Regenerate ONLY this section: ${sectionName}
 
